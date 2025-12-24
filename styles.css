@@ -1,201 +1,141 @@
-@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Audiowide&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;700&family=Orbitron:wght@500;900&display=swap');
 
 :root {
-  /* Цветовая схема: Янтарный/Оранжевый (BMW style) */
-  --primary-glow: #ff9d00; 
-  --secondary-glow: #ff3c00;
-  --off-color: #333;
-  --bg-texture: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAIklEQVQIW2NkYGD4D8SMQAwGcAY2AbBKDBBCKBCIgWwAAMQDBywNJkt4AAAAAElFTkSuQmCC'); /* Тонкая текстура шума */
+  --neon-blue: #00f2ff;
+  --neon-red: #ff0055;
+  --neon-orange: #ff9d00;
+  --glass: rgba(0, 0, 0, 0.6);
 }
 
-* { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
-body { margin: 0; background: #000; overflow: hidden; font-family: 'Rajdhani', sans-serif; }
+body { margin: 0; background: #000; overflow: hidden; font-family: 'Chakra Petch', sans-serif; user-select: none; -webkit-touch-callout: none; }
+#root { width: 100%; height: 100%; position: relative; }
 
-#root { width: 100%; height: 100%; position: relative; background: #000; }
+/* 3D СЛОЙ */
+.canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
 
-/* СЛОИ */
-.canvas-layer {
-  position: absolute;
-  top: 0; left: 0; width: 100%; height: 100%;
-  z-index: 0; /* 3D мир на заднем плане */
-}
-
-.ui-layer {
-  position: absolute;
-  top: 0; left: 0; width: 100%; height: 100%;
-  z-index: 10;
-  pointer-events: none; /* Чтобы клики проходили к кнопкам */
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end; /* Прижимаем панель вниз */
-  
-  /* Эффект лобового стекла: легкое затемнение сверху */
-  background: linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 60%);
-}
-
-/* === ПРИБОРНАЯ ПАНЕЛЬ === */
-.dashboard-container {
-  position: relative;
-  width: 100%;
-  height: 50%; /* Занимает нижнюю половину */
-  pointer-events: auto;
-  display: flex;
-  justify-content: center;
-  align-items: flex-end;
-  padding-bottom: 20px;
-  perspective: 1000px;
-}
-
-/* Фон торпеды с текстурой */
-.dashboard-bg {
-  position: absolute;
-  bottom: -100px; /* Уходит за пределы экрана */
-  left: -10%;
-  width: 120%;
-  height: 120%;
-  background-color: #111;
-  background-image: var(--bg-texture);
-  border-top: 5px solid #222;
-  border-radius: 50% 50% 0 0;
-  box-shadow: inset 0 10px 50px rgba(0,0,0,0.8), 0 -5px 20px rgba(0,0,0,0.5);
-  transform: rotateX(20deg); /* Наклон панели */
-  z-index: -1;
-}
-
-/* Группа приборов */
-.cluster {
-  display: flex;
-  gap: 30px;
-  align-items: center;
-  background: rgba(20, 20, 20, 0.8); /* Полупрозрачный пластик */
-  backdrop-filter: blur(5px);
-  padding: 15px 30px;
-  border-radius: 60px;
-  border: 3px solid #333;
-  box-shadow: 0 10px 30px #000, inset 0 0 20px rgba(0,0,0,0.5);
-  transition: all 0.5s;
-}
-
-.cluster.lit {
-  border-color: #554030;
-  box-shadow: 0 10px 40px #000, inset 0 0 30px rgba(255, 157, 0, 0.1);
-}
-
-/* === ЦИФЕРБЛАТЫ (GAUGES) === */
-.gauge {
-  width: 150px; height: 150px;
-  border-radius: 50%;
-  border: 5px solid #222;
-  position: relative;
-  background: radial-gradient(circle at center, #2a2a2a 0%, #000 100%);
-  box-shadow: inset 0 0 15px #000;
-}
-
-.gauge::after { /* Блик на стекле */
-  content: ''; position: absolute; top:0; left:0; width:100%; height:100%; border-radius:50%;
-  background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%);
+/* UI СЛОЙ */
+.ui-overlay {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10;
+  display: flex; flex-direction: column; justify-content: flex-end;
   pointer-events: none;
 }
 
-.gauge.lit { border-color: #443020; }
-
-.gauge-label {
-  position: absolute; bottom: 30%; width: 100%; text-align: center;
-  color: #666; font-size: 12px; font-weight: 700; letter-spacing: 1px;
+/* ВИНЬЕТКА (СТЕКЛО) */
+.windshield-vignette {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: radial-gradient(circle, transparent 60%, rgba(0,0,0,0.8) 100%);
+  pointer-events: none; z-index: 5;
 }
 
-.gauge-value {
-  position: absolute; bottom: 12%; width: 100%; text-align: center;
-  color: var(--primary-glow); font-family: 'Audiowide', cursive; font-size: 22px;
-  text-shadow: 0 0 10px var(--primary-glow);
-  opacity: 0; transition: opacity 0.3s;
+/* === ПРИБОРНАЯ ПАНЕЛЬ === */
+.dashboard {
+  position: relative; width: 100%; height: 50%;
+  background: linear-gradient(to top, #0a0a0a 90%, transparent 100%);
+  display: flex; justify-content: center; align-items: flex-end;
+  padding-bottom: 20px;
+  pointer-events: auto;
 }
-.cluster.lit .gauge-value { opacity: 1; }
 
-/* Стрелка */
-.needle-wrapper {
-  position: absolute; top:0; left:0; width:100%; height:100%;
-  transition: transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1); /* Плавная физика */
+/* КЛАСТЕР ПРИБОРОВ */
+.cluster {
+  display: flex; gap: 40px; align-items: flex-end;
+  background: rgba(20,20,20,0.9);
+  padding: 20px 50px;
+  border-radius: 40px 40px 0 0;
+  border-top: 2px solid #333;
+  box-shadow: 0 0 50px rgba(0,0,0,0.9);
+  transform: perspective(600px) rotateX(10deg);
 }
+
+.cluster.lit { border-color: var(--neon-orange); box-shadow: 0 0 50px rgba(255, 157, 0, 0.2); }
+
+/* КРУГЛЫЕ ДАТЧИКИ */
+.gauge {
+  width: 140px; height: 140px;
+  border-radius: 50%; border: 4px solid #333;
+  background: radial-gradient(#222, #000);
+  position: relative;
+  display: flex; justify-content: center; align-items: center;
+}
+.cluster.lit .gauge { border-color: #555; box-shadow: 0 0 15px var(--neon-orange); }
+
+.gauge-inner {
+  position: absolute; width: 90%; height: 90%;
+  border-radius: 50%; border: 2px dashed #444;
+}
+
+.value-text {
+  font-family: 'Orbitron', monospace; color: var(--neon-orange); font-size: 32px; z-index: 2;
+  text-shadow: 0 0 10px var(--neon-orange);
+}
+.label-text {
+  position: absolute; bottom: 25px; color: #666; font-size: 12px; font-weight: bold;
+}
+.gear-disp {
+  font-size: 50px; color: #fff; text-shadow: 0 0 10px #fff;
+}
+
+/* СТРЕЛКИ */
 .needle {
-  position: absolute; bottom: 50%; left: 50%;
-  width: 3px; height: 42%;
-  background: var(--secondary-glow);
-  transform: translateX(-50%);
-  box-shadow: 0 0 8px var(--secondary-glow);
-  border-radius: 2px;
-}
-.needle-cap {
-  position: absolute; top:50%; left:50%; width: 18px; height: 18px;
-  background: #111; border: 2px solid #333; border-radius:50%;
-  transform: translate(-50%, -50%); z-index: 2;
-}
-.cluster.lit .needle-cap { border-color: #554030; }
-
-
-/* === КНОПКИ И ПЕДАЛИ === */
-.center-controls {
-  position: absolute; top: -80px; /* Над приборами */
-  display: flex; gap: 20px;
+  position: absolute; top: 0; left: 50%; height: 50%; width: 4px;
+  background: var(--neon-red); transform-origin: bottom center;
+  border-radius: 2px; box-shadow: 0 0 5px red;
+  transition: transform 0.1s linear; z-index: 1;
 }
 
-.btn {
-  width: 70px; height: 70px;
-  border-radius: 50%;
-  border: 4px solid #333;
-  background: linear-gradient(#222, #111);
-  color: #777;
-  display: flex; flex-direction: column; justify-content: center; align-items: center;
-  font-size: 10px; font-weight: bold;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.5), inset 0 2px 5px rgba(255,255,255,0.05);
-  cursor: pointer; transition: all 0.2s;
-}
-.btn:active { transform: scale(0.95); }
-
-.btn-start.active {
-  border-color: var(--secondary-glow); color: var(--secondary-glow);
-  background: linear-gradient(#300, #100);
-  box-shadow: 0 0 25px var(--secondary-glow), inset 0 0 10px var(--secondary-glow);
-  text-shadow: 0 0 5px var(--secondary-glow);
-}
-.btn-lights.active {
-  border-color: var(--primary-glow); color: var(--primary-glow);
-  box-shadow: 0 0 25px var(--primary-glow);
-  text-shadow: 0 0 5px var(--primary-glow);
+/* === ПЕДАЛИ И КНОПКИ === */
+.controls-row {
+  position: absolute; bottom: 30px; width: 100%;
+  display: flex; justify-content: space-between; padding: 0 50px;
+  pointer-events: none;
 }
 
-/* ПЕДАЛИ (Новый дизайн - напольные) */
-.pedals-container {
-  position: absolute; bottom: 20px; width: 100%;
-  display: flex; justify-content: space-between; padding: 0 30px;
+.pedal-group {
+  pointer-events: auto; display: flex; flex-direction: column; align-items: center; gap: 10px;
 }
 
-.pedal-box {
-  display: flex; flex-direction: column; align-items: center;
-  position: relative; width: 90px; height: 160px;
+/* СЛАЙДЕР ВНУТРИ ПЕДАЛИ */
+.pedal {
+  width: 90px; height: 180px;
+  background: #1a1a1a;
+  border: 2px solid #444; border-radius: 10px;
+  position: relative; overflow: hidden;
+  box-shadow: 0 10px 20px #000;
 }
 
-.pedal-plate {
-  width: 100%; height: 100%;
-  background: linear-gradient(#333, #111);
-  border: 3px solid #444;
-  border-radius: 8px;
-  transform-origin: bottom center; /* Вращение от пола */
-  transform: perspective(500px) rotateX(0deg);
-  transition: transform 0.1s ease-out, border-color 0.2s;
-  box-shadow: 0 10px 20px rgba(0,0,0,0.7);
-  /* Текстура металла */
-  background-image: repeating-linear-gradient(90deg, transparent 0, transparent 10px, rgba(0,0,0,0.5) 10px, rgba(0,0,0,0.5) 12px);
+.pedal-fill {
+  position: absolute; bottom: 0; left: 0; width: 100%;
+  background: linear-gradient(0deg, var(--neon-orange), #ff4500);
+  transition: height 0.05s linear; /* Плавное заполнение */
 }
 
-/* Эффект нажатия */
-.pedal-box.pressed .pedal-plate {
-  transform: perspective(500px) rotateX(30deg) translateY(5px); /* Уходит в пол */
-  border-color: #666;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.9);
+/* КНОПКИ (NITRO / START) */
+.btn-round {
+  width: 80px; height: 80px; border-radius: 50%;
+  border: 3px solid #333; background: #111; color: #fff;
+  font-weight: bold; cursor: pointer; pointer-events: auto;
+  display: flex; justify-content: center; align-items: center; text-align: center; font-size: 12px;
+  box-shadow: 0 5px 15px #000;
 }
 
-.pedal-label {
-  margin-top: 10px; color: #888; font-weight: bold; font-size: 16px;
-  text-shadow: 0 2px 2px #000;
+.btn-nitro { border-color: #0055aa; background: radial-gradient(#003366, #001133); }
+.btn-nitro.active {
+  background: radial-gradient(#00ccff, #0055aa);
+  box-shadow: 0 0 30px #00ccff; border-color: #fff;
+  animation: shake 0.1s infinite;
 }
+
+@keyframes shake {
+  0% { transform: translate(1px, 1px) rotate(0deg); }
+  10% { transform: translate(-1px, -2px) rotate(-1deg); }
+  20% { transform: translate(-3px, 0px) rotate(1deg); }
+  30% { transform: translate(3px, 2px) rotate(0deg); }
+  40% { transform: translate(1px, -1px) rotate(1deg); }
+  50% { transform: translate(-1px, 2px) rotate(-1deg); }
+  60% { transform: translate(-3px, 1px) rotate(0deg); }
+  70% { transform: translate(3px, 1px) rotate(-1deg); }
+  80% { transform: translate(-1px, -1px) rotate(1deg); }
+  90% { transform: translate(1px, 2px) rotate(0deg); }
+  100% { transform: translate(1px, -2px) rotate(-1deg); }
+}
+

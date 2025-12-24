@@ -2,110 +2,109 @@ import { useEffect, useRef } from 'react';
 import { useStore } from './store';
 
 export function AudioEngine() {
-  const { engineRunning, rpm, turbo } = useStore();
+  const { engineRunning, isCranking, isBroken, rpm, turbo } = useStore();
   const ctx = useRef(null);
   const master = useRef(null);
   
-  // Oscillators
+  // Звуковые узлы
   const oscRumble = useRef(null);
-  const oscGrowl = useRef(null);
-  const oscWhine = useRef(null);
+  const oscCrank = useRef(null); // Стартер
   const noiseNode = useRef(null);
-  
-  // Gains
-  const gainRumble = useRef(null);
-  const gainGrowl = useRef(null);
-  const gainWhine = useRef(null);
-  const gainNoise = useRef(null);
+  const gainCrank = useRef(null);
+  const gainEngine = useRef(null);
   const gainTurbo = useRef(null);
 
   useEffect(() => {
-    if (engineRunning && !ctx.current) {
+    // ИНИЦИАЛИЗАЦИЯ (Запускается при ignition)
+    if ((engineRunning || isCranking) && !ctx.current) {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       ctx.current = new Ctx();
       master.current = ctx.current.createGain();
       master.current.connect(ctx.current.destination);
 
-      // 1. RUMBLE (Суб-бас)
+      // 1. ENGINE SOUND (Rumble)
       oscRumble.current = ctx.current.createOscillator();
-      oscRumble.current.type = 'sine';
-      gainRumble.current = ctx.current.createGain();
-      oscRumble.current.connect(gainRumble.current);
-      gainRumble.current.connect(master.current);
-      oscRumble.current.start();
-
-      // 2. GROWL (Рык)
-      oscGrowl.current = ctx.current.createOscillator();
-      oscGrowl.current.type = 'sawtooth';
-      gainGrowl.current = ctx.current.createGain();
-      // Фильтр для рыка (срезаем верхние частоты, чтобы не пищало)
+      oscRumble.current.type = 'sawtooth';
+      gainEngine.current = ctx.current.createGain();
+      
+      // Фильтр для глухого звука
       const filter = ctx.current.createBiquadFilter();
       filter.type = 'lowpass';
       filter.frequency.value = 400;
-      oscGrowl.current.connect(filter);
-      filter.connect(gainGrowl.current);
-      gainGrowl.current.connect(master.current);
-      oscGrowl.current.filterNode = filter; // Save ref
-      oscGrowl.current.start();
+      
+      oscRumble.current.connect(filter);
+      filter.connect(gainEngine.current);
+      gainEngine.current.connect(master.current);
+      oscRumble.current.start();
+      gainEngine.current.gain.value = 0; // Сначала тишина
 
-      // 3. WHINE (Высокие)
-      oscWhine.current = ctx.current.createOscillator();
-      oscWhine.current.type = 'triangle';
-      gainWhine.current = ctx.current.createGain();
-      oscWhine.current.connect(gainWhine.current);
-      gainWhine.current.connect(master.current);
-      oscWhine.current.start();
+      // 2. STARTER SOUND (Pulse)
+      oscCrank.current = ctx.current.createOscillator();
+      oscCrank.current.type = 'square';
+      oscCrank.current.frequency.value = 15; // 15Hz вибрация
+      gainCrank.current = ctx.current.createGain();
+      gainCrank.current.gain.value = 0;
+      
+      oscCrank.current.connect(gainCrank.current);
+      gainCrank.current.connect(master.current);
+      oscCrank.current.start();
 
-      // 4. TURBO (Отдельный свист)
+      // 3. TURBO WHINE
       const oscTurbo = ctx.current.createOscillator();
       oscTurbo.type = 'sine';
       gainTurbo.current = ctx.current.createGain();
+      gainTurbo.current.gain.value = 0;
       oscTurbo.connect(gainTurbo.current);
       gainTurbo.current.connect(master.current);
       oscTurbo.start();
-      oscTurbo.ref = oscTurbo; // save to ref if needed
+      oscTurbo.ref = oscTurbo;
 
-      master.current.gain.setValueAtTime(0.5, ctx.current.currentTime);
-
-    } else if (!engineRunning && ctx.current) {
+    } else if (!engineRunning && !isCranking && ctx.current) {
+        // Выключение
         ctx.current.close();
         ctx.current = null;
     }
-  }, [engineRunning]);
+  }, [engineRunning, isCranking]);
 
   useEffect(() => {
-    if (ctx.current && engineRunning) {
+    if (ctx.current) {
         const now = ctx.current.currentTime;
-        const r = Math.max(800, rpm);
 
-        // Pitch Calculation (Logarithmic sounds better)
-        const baseFreq = r / 60 * 2; // 800rpm = ~26Hz * 2 = 52Hz
+        // --- ЛОГИКА СТАРТЕРА ---
+        if (isCranking) {
+            // Звук "Чи-чи-чи": Квадратная волна прерывается
+            oscCrank.current.frequency.setValueAtTime(10, now);
+            // LFO эффект громкости
+            gainCrank.current.gain.setTargetAtTime(0.5, now, 0.05);
+            gainEngine.current.gain.setTargetAtTime(0, now, 0.1);
+        } else {
+            gainCrank.current.gain.setTargetAtTime(0, now, 0.1);
+        }
 
-        // Update Rumble
-        oscRumble.current.frequency.setTargetAtTime(baseFreq, now, 0.1);
-        gainRumble.current.gain.setTargetAtTime(0.4 + (Math.random()*0.1), now, 0.1);
+        // --- ЛОГИКА ДВИГАТЕЛЯ ---
+        if (engineRunning) {
+            const r = Math.max(100, rpm);
+            // Питч растет с оборотами
+            const pitch = r / 60 * 1.5; 
+            oscRumble.current.frequency.setTargetAtTime(pitch, now, 0.1);
+            
+            // Громкость
+            gainEngine.current.gain.setTargetAtTime(0.4, now, 0.1);
+            
+            // Турбина
+            if(oscTurbo.ref) oscTurbo.ref.frequency.setTargetAtTime(2000 + turbo*5000, now, 0.1);
+            gainTurbo.current.gain.setTargetAtTime(turbo * 0.2, now, 0.1);
+        }
 
-        // Update Growl
-        oscGrowl.current.frequency.setTargetAtTime(baseFreq * 1.5, now, 0.1);
-        // Фильтр открывается при оборотах
-        oscGrowl.current.filterNode.frequency.setTargetAtTime(200 + (r/2), now, 0.1);
-        gainGrowl.current.gain.setTargetAtTime(0.3, now, 0.1);
-
-        // Update Whine (High RPM only)
-        oscWhine.current.frequency.setTargetAtTime(baseFreq * 3, now, 0.1);
-        const whineVol = (r > 4000) ? ((r-4000)/4000) * 0.1 : 0;
-        gainWhine.current.gain.setTargetAtTime(whineVol, now, 0.1);
-
-        // Update Turbo
-        // Свист зависит от переменной turbo из store
-        // Частота от 2000 до 8000
-        if (gainTurbo.current) {
-             gainTurbo.current.gain.setTargetAtTime(turbo * 0.15, now, 0.1);
-             // Находим осциллятор турбины (он не в ref, упрощение) - пропустим точную частоту для краткости, громкости хватит для эффекта
+        // --- ЛОГИКА ПОЛОМКИ (ВЗРЫВ) ---
+        if (isBroken) {
+            // Резко глушим всё
+            gainEngine.current.gain.setTargetAtTime(0, now, 0.05);
+            gainTurbo.current.gain.setTargetAtTime(0, now, 0.05);
+            // Здесь можно добавить "Bang" шум, если усложнить код
         }
     }
-  }, [rpm, turbo, engineRunning]);
+  }, [rpm, turbo, isCranking, engineRunning, isBroken]);
 
   return null;
 }
-

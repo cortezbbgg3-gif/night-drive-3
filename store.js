@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 const lerp = (start, end, t) => start * (1 - t) + end * t;
+const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
 
 export const useStore = create((set, get) => ({
   // Inputs
@@ -8,36 +9,37 @@ export const useStore = create((set, get) => ({
   brake: 0,
   nitroActive: false,
   
-  // States
+  // System
   ignition: false,
   engineRunning: false,
   lights: false,
-  isStalling: false, // Троит/Задыхается
   
-  // Physics
+  // Physics State
   rpm: 0,
-  speed: 0,
+  speed: 0,     // km/h
   gear: 1,
-  temp: 90, // Температура (90 - норма, 130 - смерть)
-  turboPressure: 0,
-  odometer: 1240,
-  shake: 0,
+  temp: 85,     // Celsius
+  turbo: 0,     // 0.0 - 1.0 (Pressure)
+  odometer: 1420,
   
+  // Visuals
+  shake: 0,
+  smokeIntensity: 0, // Для перегрева/бернаута
+  roadCurve: 0,      // Текущий изгиб дороги
+
   // Actions
-  setGas: (v) => set({ gas: Math.max(0, Math.min(1, v)) }),
-  setBrake: (v) => set({ brake: Math.max(0, Math.min(1, v)) }),
+  setGas: (v) => set({ gas: clamp(v, 0, 1) }),
+  setBrake: (v) => set({ brake: clamp(v, 0, 1) }),
   setNitro: (v) => set({ nitroActive: v }),
   toggleLights: () => set(s => ({ lights: !s.lights })),
   
   toggleIgnition: () => {
     const s = get();
-    if (s.engineRunning) {
-      set({ engineRunning: false, ignition: false, rpm: 0, turboPressure: 0 });
+    if (s.ignition) {
+        set({ ignition: false, engineRunning: false, rpm: 0, turbo: 0 });
     } else {
-      set({ ignition: true });
-      setTimeout(() => {
-         if(get().ignition) set({ engineRunning: true, rpm: 900, temp: 90 });
-      }, 600);
+        set({ ignition: true });
+        setTimeout(() => set({ engineRunning: true, rpm: 800 }), 600);
     }
   },
 
@@ -45,100 +47,92 @@ export const useStore = create((set, get) => ({
     const s = get();
     if (!s.ignition) return;
 
-    // --- 1. ЛОГИКА КОНФЛИКТА ПЕДАЛЕЙ (BRAKE + GAS) ---
+    const idleRPM = 800 + Math.random() * 30;
+    const maxRPM = 7500;
     const isBurnout = s.brake > 0.1 && s.gas > 0.1;
-    
-    // Если нажат тормоз:
-    // 1. Если газ слабый -> Обороты давятся (машина глохнет)
-    // 2. Если газ сильный -> Обороты растут (бернаут), но скорость 0
-    let rpmResistance = 0;
-    
-    if (isBurnout) {
-        // Борьба тормоза и двигателя
-        if (s.brake > s.gas) rpmResistance = 3000; // Тормоз побеждает -> глохнем
-        else rpmResistance = 0; // Газ побеждает -> ревем на месте
-    }
 
-    // --- 2. РАСЧЕТ ТЕМПЕРАТУРЫ ---
-    // Температура растет от оборотов и ЭКСТРЕМАЛЬНО растет от бернаута
-    let targetTemp = 90 + (s.rpm / 8000) * 20;
-    if (isBurnout) targetTemp += 50; // Перегрев
-    
-    let newTemp = lerp(s.temp, targetTemp, 0.5 * dt);
-    
-    // Смерть от перегрева
-    if (newTemp > 130 && s.engineRunning) {
-        set({ engineRunning: false, rpm: 0 }); // ГЛОХНЕТ
-        // Можно добавить звук "Пшшш" в AudioEngine
-    }
-
-    // --- 3. РАСЧЕТ ОБОРОТОВ (RPM) ---
-    if (!s.engineRunning) {
-         set({ rpm: Math.max(0, s.rpm - 1000 * dt), temp: Math.max(20, s.temp - 5 * dt) });
-         return;
-    }
-
-    const maxRPM = 8000;
-    const idleRPM = 900 + (Math.random() * 50); // Неровный холостой
-    
-    // Целевые обороты
-    let targetRPM = idleRPM + (s.gas * 7500);
-    if (s.nitroActive) targetRPM = 9000;
-    
-    // Применяем сопротивление от тормоза
-    targetRPM -= rpmResistance; 
-
-    // Физика маховика
-    let newRPM = lerp(s.rpm, targetRPM, (s.gas > 0.1 ? 3 : 1) * dt);
-    
-    // Эффект "Троения" (Stalling) перед тем как заглохнуть
-    let isStalling = false;
-    if (newRPM < 600) {
-        isStalling = true;
-        newRPM += (Math.random() - 0.5) * 300; // Дергается
+    // 1. ЦЕЛЕВЫЕ ОБОРОТЫ
+    let targetRPM = idleRPM;
+    if (s.engineRunning) {
+        // Газ поднимает обороты, но под нагрузкой (если едем) это тяжелее
+        const load = clamp(s.speed / 200, 0, 1); 
+        const power = s.gas * (s.nitroActive ? 1.5 : 1.0);
+        
+        if (s.gear === 0) { // Нейтраль
+             targetRPM += power * 7000;
+        } else {
+             // На передаче обороты привязаны к скорости, но могут проскальзывать (сцепление)
+             // Если скорость 0, а газ в пол -> Stall (глохнет) или Burnout
+             if (s.speed < 5 && s.gas > 0.1 && !isBurnout) {
+                 // Пытается тронуться - обороты падают (нагрузка)
+                 targetRPM = 1200 + power * 1000; 
+             } else {
+                 targetRPM += power * 7000 * (1 - load * 0.3);
+             }
+        }
     }
     
-    // Если упали совсем низко - глохнем
-    if (newRPM < 300) {
-        set({ engineRunning: false });
-    }
+    if (isBurnout) targetRPM = 5000 + (Math.random() * 500); // Ограничитель при бернауте
 
-    // --- 4. ТУРБИНА И СКОРОСТЬ ---
-    let targetTurbo = (s.gas > 0.3 && s.rpm > 2500) ? 1 : 0;
-    let newTurbo = lerp(s.turboPressure, targetTurbo, 2 * dt);
+    // Плавность стрелки (Инерция маховика)
+    let newRPM = lerp(s.rpm, targetRPM, dt * (s.gas > 0.1 ? 2.0 : 1.0));
+    
+    // Отсечка
+    if (newRPM > 7200) newRPM = 7100 + Math.random() * 200;
 
-    // Автомат (переключение)
+    // 2. КОРОБКА ПЕРЕДАЧ (Медленная, старая)
     let nextGear = s.gear;
-    if (newRPM > 7000 && s.gear < 6 && !isBurnout) { // Не переключаем если стоим
+    if (newRPM > 6800 && s.gear < 5 && !isBurnout) {
         nextGear++;
-        newRPM -= 2500;
-        newTurbo = 0; // Пшик турбины
-    } else if (newRPM < 2000 && s.gear > 1) {
+        newRPM -= 2000; // Падение оборотов
+    } else if (newRPM < 1500 && s.gear > 1) {
         nextGear--;
         newRPM += 1000;
     }
 
-    // Расчет скорости
-    const power = s.gas * 300 * (1/nextGear);
-    const brakeForce = s.brake * 1000;
-    const friction = s.speed * 0.5;
-    
-    let accel = power - friction;
-    if (!isBurnout) accel -= brakeForce; // Если бернаут - тормоз не тормозит колеса, а держит машину
-    else if (isBurnout) accel = 0; // Скорость не растет
+    // 3. СКОРОСТЬ (Медленный разгон)
+    // Формула: (Мощность - Сопротивление Воздуха - Тормоз)
+    const hp = s.gas * 120 * (s.nitroActive ? 2.5 : 1.0); // 120 лошадей (мало, зато реалистично)
+    const drag = (s.speed * s.speed) * 0.008; 
+    const friction = 10;
+    const brakeForce = s.brake * 600;
 
-    let newSpeed = s.speed + accel * dt * 0.5;
+    let accel = (hp / nextGear) - drag - friction;
+    if (!isBurnout) accel -= brakeForce;
+    else accel = 0; // На бернауте стоим
+
+    let newSpeed = s.speed + accel * dt * 0.8; // 0.8 замедляет физику времени
     if (newSpeed < 0) newSpeed = 0;
+
+    // 4. ТЕМПЕРАТУРА И ДЫМ
+    let targetTemp = 90 + (s.rpm / 7000) * 20;
+    if (isBurnout || s.nitroActive) targetTemp += 40;
+    let newTemp = lerp(s.temp, targetTemp, dt * 0.2);
+    
+    // Дым если перегрев или бернаут
+    let smoke = 0;
+    if (isBurnout) smoke = 1.0;
+    if (newTemp > 115) smoke = (newTemp - 115) / 15;
+
+    // 5. ТУРБИНА (Свист)
+    let targetTurbo = (s.gas > 0.5 && s.rpm > 2500) ? 1.0 : 0.0;
+    let newTurbo = lerp(s.turbo, targetTurbo, dt * 1.5);
+
+    // 6. ДОРОГА (Повороты)
+    // Меняем кривизну плавно по синусоиде времени
+    const time = Date.now() / 5000;
+    const curve = Math.sin(time) * 20;
 
     set({
       rpm: newRPM,
       speed: newSpeed,
-      temp: newTemp,
-      turboPressure: newTurbo,
-      isStalling: isStalling,
       gear: nextGear,
-      odometer: s.odometer + newSpeed * dt * 0.001,
-      shake: (newSpeed/400) + (isStalling ? 0.05 : 0) + (s.nitroActive ? 0.1 : 0)
+      temp: newTemp,
+      turbo: newTurbo,
+      smokeIntensity: smoke,
+      roadCurve: curve,
+      odometer: s.odometer + (newSpeed * dt * 0.001),
+      shake: (newSpeed / 300) + (isBurnout ? 0.05 : 0) + (s.nitroActive ? 0.1 : 0)
     });
   }
 }));

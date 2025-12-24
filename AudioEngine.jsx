@@ -2,70 +2,70 @@ import { useEffect, useRef } from 'react';
 import { useStore } from './store';
 
 export function AudioEngine() {
-  const { engineRunning, rpm } = useStore();
-  const audioCtx = useRef(null);
-  const osc = useRef(null);
-  const gain = useRef(null);
+  const { engineRunning, rpm, nitroActive } = useStore();
+  const ctxRef = useRef(null);
+  const oscRef = useRef(null);
+  const gainRef = useRef(null);
+  const nitroOscRef = useRef(null);
+  const nitroGainRef = useRef(null);
 
   useEffect(() => {
-    if (engineRunning && !audioCtx.current) {
-      // Init Sound
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      audioCtx.current = new AudioContext();
-      
-      osc.current = audioCtx.current.createOscillator();
-      gain.current = audioCtx.current.createGain();
-      
-      // Более сложная волна для реализма (вместо sawtooth)
-      // Комбинируем низкие и высокие гармоники
-      const real = new Float32Array([0, 0.4, 0.4, 1, 1, 1, 0.3, 0.7, 0.6, 0.5, 0.9, 0.8]);
-      const imag = new Float32Array(real.length).fill(0);
-      const wave = audioCtx.current.createPeriodicWave(real, imag);
-      osc.current.setPeriodicWave(wave);
+    if (engineRunning && !ctxRef.current) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      ctxRef.current = new Ctx();
 
-      // Lowpass filter (звук из салона)
-      const filter = audioCtx.current.createBiquadFilter();
+      // ENGINE SOUND (Low rumble)
+      oscRef.current = ctxRef.current.createOscillator();
+      gainRef.current = ctxRef.current.createGain();
+      
+      oscRef.current.type = 'sawtooth';
+      
+      // Lowpass filter (Muffle)
+      const filter = ctxRef.current.createBiquadFilter();
       filter.type = 'lowpass';
-      filter.frequency.value = 350;
-      
-      osc.current.connect(filter);
-      filter.connect(gain.current);
-      gain.current.connect(audioCtx.current.destination);
-      
-      gain.current.gain.value = 0; // Начинаем с тишины
-      osc.current.start();
-      // Плавный старт громкости
-      gain.current.gain.setTargetAtTime(0.3, audioCtx.current.currentTime, 0.5);
-      
-    } else if (!engineRunning && audioCtx.current) {
-      // Плавное выключение (Fade out) за 0.5 сек
-      if (gain.current) {
-          gain.current.gain.setTargetAtTime(0, audioCtx.current.currentTime, 0.2);
-      }
-      // Полная остановка через секунду
-      setTimeout(() => {
-          if (audioCtx.current && audioCtx.current.state !== 'closed') {
-            osc.current.stop();
-            audioCtx.current.close();
-            audioCtx.current = null;
-          }
-      }, 500);
+      filter.frequency.value = 400;
+
+      oscRef.current.connect(filter);
+      filter.connect(gainRef.current);
+      gainRef.current.connect(ctxRef.current.destination);
+      oscRef.current.start();
+
+      // NITRO SOUND (High pitch whine)
+      nitroOscRef.current = ctxRef.current.createOscillator();
+      nitroGainRef.current = ctxRef.current.createGain();
+      nitroOscRef.current.type = 'sine';
+      nitroOscRef.current.frequency.value = 1000;
+      nitroOscRef.current.connect(nitroGainRef.current);
+      nitroGainRef.current.connect(ctxRef.current.destination);
+      nitroOscRef.current.start();
+      nitroGainRef.current.gain.value = 0;
+
+    } else if (!engineRunning && ctxRef.current) {
+      ctxRef.current.close();
+      ctxRef.current = null;
     }
   }, [engineRunning]);
 
-  // Модуляция звука от оборотов
   useEffect(() => {
-    if (audioCtx.current && engineRunning && osc.current) {
-        // Pitch: Басовитее на низах (40Hz), выше на верхах (350Hz)
-        const pitch = 40 + (rpm / 7500) * 310;
-        osc.current.frequency.setTargetAtTime(pitch, audioCtx.current.currentTime, 0.05);
-        
-        // Rumble: Громкость чуть дрожит и растет с оборотами
-        const baseVol = 0.2 + (rpm / 8000) * 0.2;
-        const rumble = baseVol + (Math.random() * 0.05);
-        gain.current.gain.setTargetAtTime(rumble, audioCtx.current.currentTime, 0.05);
+    if (ctxRef.current && engineRunning) {
+      // Engine Pitch
+      const pitch = 50 + (rpm / 8000) * 350;
+      oscRef.current.frequency.setTargetAtTime(pitch, ctxRef.current.currentTime, 0.1);
+      
+      // Engine Volume (Rumble)
+      const vol = 0.2 + (rpm / 8000) * 0.1;
+      gainRef.current.gain.setTargetAtTime(vol, ctxRef.current.currentTime, 0.1);
+
+      // Nitro Sound
+      if (nitroActive) {
+          nitroGainRef.current.gain.setTargetAtTime(0.1, ctxRef.current.currentTime, 0.2);
+          nitroOscRef.current.frequency.setTargetAtTime(2000 + (rpm/10), ctxRef.current.currentTime, 0.5);
+      } else {
+          nitroGainRef.current.gain.setTargetAtTime(0, ctxRef.current.currentTime, 0.2);
+      }
     }
-  }, [rpm, engineRunning]);
+  }, [rpm, nitroActive, engineRunning]);
 
   return null;
 }
+

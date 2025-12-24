@@ -1,69 +1,103 @@
 import { create } from 'zustand';
 
 export const useStore = create((set, get) => ({
-  // User Inputs (0.0 - 1.0)
-  gasInput: 0,
-  brakeInput: 0,
+  // Controls (0.0 - 1.0)
+  gasPressure: 0,  // Сила нажатия газа
+  brakePressure: 0,
+  nitroActive: false,
   
-  // Car Logic
-  ignition: false,     // Зажигание (Электрика)
-  engineRunning: false,// Двигатель заведен
+  // Car State
+  ignition: false,
+  engineRunning: false,
   lights: false,
   
-  // Physics Values
-  rpm: 0,
-  speed: 0,
-  gear: 1,
+  // Physics
+  rpm: 0,       // 0 - 8000
+  speed: 0,     // 0 - 260 km/h
+  gear: 1,      // 1 - 6
+  odometer: 1240, // Пробег
   
+  // Visual Shake Factor (для эффектов)
+  shake: 0,
+
   // Actions
-  setGas: (val) => set({ gasInput: val }),
-  setBrake: (val) => set({ brakeInput: val }),
+  setGas: (val) => set({ gasPressure: val }),
+  setBrake: (val) => set({ brakePressure: val }),
+  setNitro: (val) => set({ nitroActive: val }),
   toggleLights: () => set(s => ({ lights: !s.lights })),
-  
-  startEngine: async () => {
+  toggleIgnition: () => {
     const s = get();
-    if (s.engineRunning) {
-        set({ engineRunning: false, ignition: false, rpm: 0 });
-        return;
+    if(s.engineRunning) {
+        set({ engineRunning: false, ignition: false, rpm: 0, speed: 0 });
+    } else {
+        set({ ignition: true });
+        // Заводим через 800мс
+        setTimeout(() => set({ engineRunning: true, rpm: 900 }), 800);
     }
-    set({ ignition: true }); // Включаем приборы
-    // Эмуляция стартера (через 1 сек заводится)
-    setTimeout(() => {
-        set({ engineRunning: true, rpm: 800 });
-    }, 800);
   },
 
+  // === ФИЗИЧЕСКОЕ ЯДРО (ВЫЗЫВАЕТСЯ КАЖДЫЙ КАДР) ===
   updatePhysics: (dt) => {
     const s = get();
+    if (!s.engineRunning) return;
+
+    // 1. КОНФИГУРАЦИЯ АВТО
+    const gearRatios = [0, 3.8, 2.4, 1.8, 1.4, 1.1, 0.9]; // Передаточные числа
+    const finalDrive = 3.5;
+    const maxRPM = 7500;
+    const idleRPM = 900;
     
-    // 1. RPM Logic
-    let targetRPM = 0;
-    if (s.engineRunning) {
-        // Холостые + Газ
-        const idle = 800 + (Math.random() * 50); // Легкое дыхание мотора
-        const max = 7500;
-        // Если сцепление (нейтраль или движение) - упростим для игры
-        targetRPM = idle + (s.gasInput * (max - idle));
-        
-        // Отсечка
-        if (targetRPM > 7200) targetRPM = 7100 + Math.random() * 200;
+    // 2. РАСЧЕТ ОБОРОТОВ (RPM)
+    let targetRPM = s.rpm;
+    let torque = s.gasPressure * (s.nitroActive ? 2.5 : 1.0); // Нитро удваивает силу
+    
+    // Если газ нажат, обороты растут быстро, если нет - падают медленно
+    if (s.gasPressure > 0.1) {
+        targetRPM += torque * 4000 * dt; 
+    } else {
+        targetRPM -= (2000 + s.brakePressure * 5000) * dt;
+    }
+    
+    // Сцепление с дорогой (RPM зависит от скорости и передачи)
+    // Это эмуляция жесткой сцепки (Lock-up)
+    const wheelRPM = (s.speed / 200) * 8000; // Грубая конвертация
+    // Смешиваем "свободные" обороты и обороты от колес
+    // На нейтрали (или выжатом сцеплении при переключении) обороты свободны
+    
+    // ЛОГИКА ПЕРЕКЛЮЧЕНИЯ (АВТОМАТ)
+    let nextGear = s.gear;
+    if (s.rpm > 7000 && s.gear < 6) {
+        // SHIFT UP
+        nextGear++;
+        targetRPM -= 2500; // Обороты падают при повышении
+    } else if (s.rpm < 2000 && s.gear > 1 && s.speed > 10) {
+        // SHIFT DOWN
+        nextGear--;
+        targetRPM += 1500; // Подгазовка
     }
 
-    // Инерция стрелки тахометра (она не мгновенная)
-    let newRPM = s.rpm + (targetRPM - s.rpm) * 5 * dt;
+    // Ограничители
+    targetRPM = Math.max(idleRPM, Math.min(maxRPM + (Math.random()*100), targetRPM));
 
-    // 2. Speed Logic
-    // Скорость набирается, если есть RPM и передача
-    const power = s.engineRunning ? (s.gasInput * 40) : 0;
-    const brake = (s.brakeInput * 80) + 2; // +2 это трение качения
+    // 3. РАСЧЕТ СКОРОСТИ
+    // Ускорение зависит от передачи (на 1-й мощно, на 6-й слабо)
+    const gearFactor = 1 / nextGear; 
+    const accel = (torque * 30 * gearFactor) - (s.brakePressure * 80) - (s.speed * 0.05); // 0.05 трение воздуха
     
-    let acceleration = power - brake;
-    let newSpeed = s.speed + acceleration * dt;
-    if (newSpeed < 0) newSpeed = 0;
+    let nextSpeed = s.speed + accel * dt;
+    if (nextSpeed < 0) nextSpeed = 0;
+
+    // 4. ТРЯСКА (SHAKE)
+    // Трясет от скорости + очень сильно от НИТРО
+    let shakeVal = (nextSpeed / 300);
+    if (s.nitroActive) shakeVal += 0.1; // Рывок камеры
     
-    // Связь скорости и оборотов (Gear shift simulation)
-    // Если скорость растет, а газ не нажат -> обороты падают медленнее
-    
-    set({ rpm: newRPM, speed: newSpeed });
+    set({
+        rpm: targetRPM,
+        speed: nextSpeed,
+        gear: nextGear,
+        odometer: s.odometer + (nextSpeed * dt * 0.0002), // Наматываем пробег
+        shake: shakeVal
+    });
   }
 }));

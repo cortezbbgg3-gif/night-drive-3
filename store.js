@@ -1,78 +1,69 @@
 import { create } from 'zustand';
 
 export const useStore = create((set, get) => ({
-  // Controls
-  gas: 0,
-  brake: 0,
-  nitro: false,
-  lightsOn: false,
+  // User Inputs (0.0 - 1.0)
+  gasInput: 0,
+  brakeInput: 0,
   
-  // Vehicle State
-  rpm: 800,
+  // Car Logic
+  ignition: false,     // Зажигание (Электрика)
+  engineRunning: false,// Двигатель заведен
+  lights: false,
+  
+  // Physics Values
+  rpm: 0,
   speed: 0,
   gear: 1,
-  engineTemp: 50, // Градусы Цельсия
-  distance: 0,
-  isEngineOn: false,
   
   // Actions
-  setGas: (val) => set({ gas: Math.max(0, Math.min(1, val)) }),
-  setBrake: (val) => set({ brake: Math.max(0, Math.min(1, val)) }),
-  setNitro: (val) => set({ nitro: val }),
-  toggleLights: () => set((state) => ({ lightsOn: !state.lightsOn })),
-  toggleEngine: () => set((state) => ({ isEngineOn: !state.isEngineOn })),
+  setGas: (val) => set({ gasInput: val }),
+  setBrake: (val) => set({ brakeInput: val }),
+  toggleLights: () => set(s => ({ lights: !s.lights })),
   
-  // Physics Update Loop
-  updatePhysics: (delta) => {
+  startEngine: async () => {
     const s = get();
-    if (!s.isEngineOn) {
-        // Если двигатель выключен, обороты падают до 0
-        if (s.rpm > 0) set({ rpm: Math.max(0, s.rpm - 1000 * delta) });
+    if (s.engineRunning) {
+        set({ engineRunning: false, ignition: false, rpm: 0 });
         return;
     }
+    set({ ignition: true }); // Включаем приборы
+    // Эмуляция стартера (через 1 сек заводится)
+    setTimeout(() => {
+        set({ engineRunning: true, rpm: 800 });
+    }, 800);
+  },
 
-    // Параметры авто
-    const maxRPM = 8000;
-    const idleRPM = 900;
-    const powerFactor = s.nitro ? 3.0 : 1.0; // Нитро дает рывок
+  updatePhysics: (dt) => {
+    const s = get();
     
-    // 1. Расчет оборотов (RPM)
-    // Газ поднимает обороты, но с инерцией (lerp)
-    let targetRPM = idleRPM + (s.gas * (maxRPM - idleRPM));
-    if (s.nitro) targetRPM = maxRPM; // Нитро кладет стрелку
-    
-    // Эмуляция нагрузки: если скорость растет, обороты растут медленнее
-    const load = s.speed / 200; 
-    const revSpeed = (s.gas * 5000 * powerFactor * (1 - load * 0.5)) * delta;
-    const revDrop = (2000 + s.brake * 3000) * delta;
-    
-    let newRPM = s.rpm;
-    if (s.gas > 0.05) {
-        newRPM += revSpeed;
-    } else {
-        newRPM -= revDrop;
+    // 1. RPM Logic
+    let targetRPM = 0;
+    if (s.engineRunning) {
+        // Холостые + Газ
+        const idle = 800 + (Math.random() * 50); // Легкое дыхание мотора
+        const max = 7500;
+        // Если сцепление (нейтраль или движение) - упростим для игры
+        targetRPM = idle + (s.gasInput * (max - idle));
+        
+        // Отсечка
+        if (targetRPM > 7200) targetRPM = 7100 + Math.random() * 200;
     }
-    
-    // Лимиты и дрожание стрелки (Noise)
-    newRPM = Math.max(idleRPM, Math.min(maxRPM, newRPM));
-    const jitter = (Math.random() - 0.5) * (s.rpm / 200); // Чем выше обороты, тем сильнее вибрация
-    
-    // 2. Расчет Скорости
-    // Скорость зависит от RPM и передачи (упрощенно)
-    const acceleration = (s.gas * 20 * powerFactor) - (s.brake * 60) - (s.speed * 0.1); // 0.1 - сопротивление воздуха
-    let newSpeed = s.speed + acceleration * delta;
-    newSpeed = Math.max(0, newSpeed);
 
-    // 3. Температура
-    // Растет от высоких оборотов
-    let targetTemp = 90 + (s.rpm / maxRPM) * 30; // Рабочая ~90-120
-    let newTemp = s.engineTemp + (targetTemp - s.engineTemp) * delta * 0.05;
+    // Инерция стрелки тахометра (она не мгновенная)
+    let newRPM = s.rpm + (targetRPM - s.rpm) * 5 * dt;
 
-    set({ 
-      rpm: newRPM + jitter, 
-      speed: newSpeed, 
-      engineTemp: newTemp,
-      distance: s.distance + (newSpeed * delta)
-    });
+    // 2. Speed Logic
+    // Скорость набирается, если есть RPM и передача
+    const power = s.engineRunning ? (s.gasInput * 40) : 0;
+    const brake = (s.brakeInput * 80) + 2; // +2 это трение качения
+    
+    let acceleration = power - brake;
+    let newSpeed = s.speed + acceleration * dt;
+    if (newSpeed < 0) newSpeed = 0;
+    
+    // Связь скорости и оборотов (Gear shift simulation)
+    // Если скорость растет, а газ не нажат -> обороты падают медленнее
+    
+    set({ rpm: newRPM, speed: newSpeed });
   }
 }));

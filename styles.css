@@ -1,260 +1,143 @@
-@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Orbitron:wght@500;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Manrope:wght@400;800&display=swap');
 
-:root {
-  --neon-orange: #ff9d00;
-  --neon-red: #ff3333;
-  --neon-blue: #00ccff;
-  --neon-green: #00ff00;
-  --glass-bg: rgba(15, 15, 15, 0.95);
-  --border-col: #333;
-}
-
-/* СБРОС И БАЗА */
-* { 
-  box-sizing: border-box; 
-  user-select: none; 
-  -webkit-tap-highlight-color: transparent; 
-  -webkit-touch-callout: none;
-}
-
-body { 
-  margin: 0; 
-  background: #000; 
-  overflow: hidden; 
-  font-family: 'Chakra Petch', sans-serif;
-  overscroll-behavior: none;
-}
-
+body { margin: 0; background: #000; overflow: hidden; user-select: none; font-family: 'Manrope', sans-serif; }
 #root { width: 100%; height: 100%; position: relative; }
 
-/* 3D СЛОЙ (ЗАДНИЙ ПЛАН) */
-.canvas-container { 
-  position: absolute; 
-  top: 0; left: 0; 
-  width: 100%; height: 100%; 
-  z-index: 1; 
-}
+/* === 3D WORLD LAYER === */
+.world-layer { position: absolute; top: 0; left: 0; width: 100%; height: 60%; z-index: 1; }
 
-/* UI СЛОЙ (ИНТЕРФЕЙС) */
-.ui-overlay {
-  position: absolute; 
-  top: 0; left: 0; 
-  width: 100%; height: 100%; 
-  z-index: 10;
-  pointer-events: none; /* Пропускаем клики сквозь пустые места */
-  display: flex; 
-  flex-direction: column; 
-  justify-content: flex-end; /* Прижимаем к низу */
-}
-
-/* ВИНЬЕТКА (АТМОСФЕРА) */
-.vignette {
+/* === INTERIOR / DASHBOARD LAYER === */
+.cabin-layer {
   position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-  background: radial-gradient(circle, transparent 40%, rgba(0,0,0,0.8) 100%);
+  z-index: 10;
   pointer-events: none;
+  display: flex; flex-direction: column; justify-content: flex-end;
 }
 
-/* === ПРИБОРНАЯ ПАНЕЛЬ === */
-.dashboard {
-  position: relative; 
-  width: 100%; 
-  height: 48vmin; /* Адаптивная высота */
-  display: flex; 
-  justify-content: center; 
-  align-items: flex-end;
-  padding-bottom: 2vmin;
+/* ЛОБОВОЕ СТЕКЛО (Frame) */
+.windshield-frame {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  box-shadow: inset 0 0 100px #000;
+  background: 
+    linear-gradient(to bottom, #111 0%, transparent 10%, transparent 50%, rgba(0,0,0,0.8) 100%), /* Тень сверху/снизу */
+    linear-gradient(90deg, #111 0%, transparent 10%, transparent 90%, #111 100%); /* Стойки по бокам */
+  z-index: 5;
+}
+
+/* ТОРПЕДО (DASHBOARD BODY) */
+.dashboard-body {
+  position: relative; width: 100%; height: 45%;
+  background: #181818;
+  /* Текстура пластика (шум) */
+  background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAIklEQVQIW2NkYGD4D8SMQAwGcAY2AbBKDBBCKBCIgWwAAMQDBywNJkt4AAAAAElFTkSuQmCC');
+  border-top: 4px solid #222;
+  border-radius: 50% 50% 0 0 / 20px 20px 0 0;
+  box-shadow: 0 -10px 50px #000;
+  display: flex; justify-content: center; align-items: center;
   pointer-events: auto;
-  perspective: 800px; /* Для 3D наклона панели */
 }
 
-/* БЛОК ПРИБОРОВ (CLUSTER) */
-.cluster {
-  display: flex; 
-  align-items: center; 
-  justify-content: center; 
-  gap: 3vmin;
-  background: linear-gradient(to bottom, #222, #111);
-  padding: 3vmin 5vmin;
-  border-radius: 4vmin 4vmin 0 0;
-  border-top: 0.5vmin solid var(--border-col);
-  box-shadow: 0 -1vmin 5vmin rgba(0,0,0,0.9);
-  transform: rotateX(15deg); /* Наклон "от себя" */
-  transition: border-color 0.3s;
+/* КОЗЫРЕК ПРИБОРОВ */
+.cluster-hood {
+  position: absolute; bottom: 10%;
+  width: 70%; height: 80%;
+  background: #111;
+  border-radius: 40px;
+  border: 2px solid #333;
+  box-shadow: inset 0 0 30px #000;
+  display: flex; justify-content: space-around; align-items: center;
+  padding: 0 40px;
 }
 
-/* ПОДСВЕТКА ВКЛЮЧЕНА */
-.cluster.lit { 
-  border-color: var(--neon-orange); 
-  box-shadow: 0 -1vmin 5vmin rgba(255, 150, 0, 0.15); 
-}
-
-/* === ДАТЧИКИ (GAUGES) === */
+/* ПРИБОРЫ (КРУГИ) */
 .gauge {
-  width: 18vmin; 
-  height: 18vmin; 
-  border-radius: 50%; 
-  border: 0.8vmin solid #222;
-  background: radial-gradient(circle, #1a1a1a 0%, #000 100%);
+  width: 140px; height: 140px;
+  background: radial-gradient(circle at center, #222 0%, #000 70%);
+  border-radius: 50%;
+  border: 3px solid #444;
   position: relative;
-  display: flex; 
-  justify-content: center; 
-  align-items: center;
-  box-shadow: inset 0 0 2vmin #000;
+  box-shadow: 0 0 10px rgba(0,0,0,0.5);
 }
 
-.cluster.lit .gauge { 
-  border-color: #444; 
-  box-shadow: 0 0 3vmin rgba(255, 157, 0, 0.2); 
+/* НАСЕЧКИ (TICKS) - Рисуем градиентом */
+.ticks {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: repeating-conic-gradient(from -135deg, transparent 0deg, transparent 2deg, #555 3deg, transparent 4deg);
+  -webkit-mask-image: radial-gradient(transparent 60%, black 65%);
+  mask-image: radial-gradient(transparent 60%, black 65%);
+  border-radius: 50%;
+  transform: rotate(0deg); /* Для корректного угла */
+}
+/* Красная зона тахометра */
+.ticks.redzone {
+  background: repeating-conic-gradient(from 90deg, #a00 0deg, #a00 2deg, transparent 3deg, transparent 4deg);
 }
 
-.gauge-val {
-  font-family: 'Orbitron', monospace; 
-  font-size: 4.5vmin; 
-  color: var(--neon-orange);
-  text-shadow: 0 0 1.5vmin var(--neon-orange); 
-  z-index: 2;
+.gauge-center {
+  position: absolute; top: 50%; left: 50%; width: 20px; height: 20px;
+  background: #111; border-radius: 50%; transform: translate(-50%, -50%);
+  z-index: 5; box-shadow: 0 2px 5px #000;
 }
 
-.gauge-label {
-  position: absolute; 
-  bottom: 20%; 
-  font-size: 1.5vmin; 
-  color: #666; 
-  font-weight: bold;
-  letter-spacing: 0.1vmin;
+/* ЦИФРЫ И ЛЕЙБЛЫ */
+.label {
+  position: absolute; bottom: 25%; width: 100%; text-align: center;
+  color: #888; font-size: 10px; font-weight: 800; letter-spacing: 1px;
+}
+.val-display {
+  position: absolute; bottom: 40%; width: 100%; text-align: center;
+  color: #fff; font-family: 'Orbitron', monospace; font-size: 14px;
 }
 
 /* СТРЕЛКИ */
 .needle {
-  position: absolute; 
-  top: 0; left: 50%; 
-  width: 0.5vmin; height: 50%;
-  background: var(--neon-red); 
+  position: absolute; top: 10%; left: 50%;
+  width: 3px; height: 40%;
+  background: #ff3300;
   transform-origin: bottom center;
-  box-shadow: 0 0 1vmin red; 
-  transition: transform 0.05s cubic-bezier(0.1, 0.7, 1.0, 0.1); 
-  z-index: 1;
-  border-radius: 0.5vmin;
+  border-radius: 2px;
+  box-shadow: 0 0 5px rgba(255, 50, 0, 0.5);
+  transition: transform 0.1s linear; /* Плавность, но не мыло */
+  z-index: 4;
 }
 
-/* ЦЕНТРАЛЬНАЯ ИНФО */
-.info-box {
-  display: flex; 
-  flex-direction: column; 
-  align-items: center; 
-  justify-content: center;
-  width: 12vmin;
+/* ПЕДАЛИ И КНОПКИ */
+.controls {
+  position: absolute; bottom: 20px; width: 100%;
+  display: flex; justify-content: space-between; padding: 0 40px;
+  pointer-events: none; z-index: 20;
 }
 
-.gear-num { 
-  font-family: 'Orbitron', sans-serif;
-  font-size: 8vmin; 
-  color: #fff; 
-  font-weight: bold; 
-  line-height: 1; 
-  text-shadow: 0 0 2vmin white; 
-}
-
-/* === УПРАВЛЕНИЕ (ПЕДАЛИ И КНОПКИ) === */
-.controls-area {
-  position: absolute; 
-  bottom: 2vmin; 
-  width: 100%;
-  display: flex; 
-  justify-content: space-between; 
-  padding: 0 5vmin;
-  pointer-events: none;
-}
-
-/* КОНТЕЙНЕР ПЕДАЛИ */
-.pedal-container {
-  pointer-events: auto; 
-  display: flex; 
-  flex-direction: column; 
-  align-items: center; 
-  gap: 1vmin;
-}
-
-/* САМА ПЕДАЛЬ (ТРЕК) */
 .pedal {
-  width: 12vmin; 
-  height: 28vmin; 
-  background: #111; 
-  border: 0.4vmin solid #444; 
-  border-radius: 1.5vmin;
-  position: relative; 
-  overflow: hidden;
-  box-shadow: 0 1vmin 3vmin #000;
-  touch-action: none; /* ВАЖНО: Блокирует скролл при слайде */
+  width: 80px; height: 200px;
+  background: linear-gradient(to bottom, #222, #111);
+  border: 2px solid #333; border-radius: 10px;
+  box-shadow: 0 5px 15px #000;
+  pointer-events: auto; position: relative; overflow: hidden;
 }
-
-/* ЗАПОЛНЕНИЕ ПЕДАЛИ (СЛАЙДЕР) */
 .pedal-fill {
-  position: absolute; 
-  bottom: 0; left: 0; 
-  width: 100%;
-  background: linear-gradient(0deg, var(--neon-orange), #ff4500);
-  transition: height 0.05s linear;
-  box-shadow: 0 0 2vmin var(--neon-orange);
+  position: absolute; bottom: 0; width: 100%; background: #ff9d00; opacity: 0.5;
+  transition: height 0.05s;
 }
 
-/* КНОПКИ ЦЕНТРАЛЬНЫЕ */
-.btn-grp {
-  position: absolute; 
-  bottom: 22vmin; /* Над приборкой */
-  left: 50%; 
-  transform: translateX(-50%);
-  display: flex; 
-  gap: 3vmin; 
-  pointer-events: auto;
-  z-index: 20;
+.center-stack {
+  position: absolute; bottom: 55%; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 15px; pointer-events: auto;
 }
-
 .btn {
-  width: 11vmin; 
-  height: 11vmin; 
-  border-radius: 50%;
-  background: radial-gradient(#222, #111); 
-  border: 0.4vmin solid #555; 
-  color: #888;
-  display: flex; 
-  justify-content: center; 
-  align-items: center;
-  font-size: 1.8vmin; 
-  font-weight: bold; 
-  cursor: pointer; 
-  text-align: center;
-  box-shadow: 0 0.5vmin 1vmin rgba(0,0,0,0.8);
-  transition: all 0.1s;
+  width: 60px; height: 60px; border-radius: 50%;
+  background: #111; border: 2px solid #444; color: #666;
+  display: flex; justify-content: center; align-items: center;
+  font-size: 10px; font-weight: bold; cursor: pointer;
+  box-shadow: 0 3px 5px #000;
 }
+.btn.active { border-color: #ff9d00; color: #ff9d00; text-shadow: 0 0 5px #ff9d00; }
+.btn-start.on { border-color: #0f0; color: #0f0; }
 
-.btn:active { transform: scale(0.95); }
-
-/* АКТИВНЫЕ СОСТОЯНИЯ КНОПОК */
-.btn-start.on { 
-  border-color: var(--neon-green); 
-  color: var(--neon-green);
-  box-shadow: 0 0 3vmin rgba(0, 255, 0, 0.4); 
-  background: radial-gradient(#052205, #000);
-}
-
-.btn.active { 
-  border-color: var(--neon-blue); 
-  color: var(--neon-blue);
-  box-shadow: 0 0 3vmin rgba(0, 204, 255, 0.4); 
-  text-shadow: 0 0 1vmin var(--neon-blue);
-}
-
-/* АНИМАЦИИ */
-@keyframes blink { 
-  0% { opacity: 1; } 
-  50% { opacity: 0.2; } 
-  100% { opacity: 1; } 
-}
-
-@keyframes pulse {
-  0% { box-shadow: 0 0 1vmin var(--neon-blue); }
-  50% { box-shadow: 0 0 3vmin var(--neon-blue); }
-  100% { box-shadow: 0 0 1vmin var(--neon-blue); }
+/* ДЫМ (CSS Overlay) */
+.smoke-overlay {
+  position: absolute; top:0; left:0; width:100%; height:60%;
+  background: rgba(255,255,255,0.0);
+  pointer-events: none; transition: background 1s; z-index: 2;
 }
 

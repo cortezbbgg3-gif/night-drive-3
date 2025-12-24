@@ -1,84 +1,127 @@
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useStore } from './store';
 
-const RoadShader = {
-  uniforms: {
-    uTime: { value: 0 },
-  },
-  vertexShader: `
-    varying vec2 vUv;
-    varying float vZ;
-    void main() {
-      vUv = uv;
-      vec3 pos = position;
-      // Искривление горизонта
-      pos.y -= pow(pos.z, 2.0) * 0.0015;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-      vZ = pos.z;
-    }
-  `,
-  fragmentShader: `
-    varying vec2 vUv;
-    varying float vZ;
-    uniform float uTime;
-    void main() {
-      // Скорость полос
-      float y = vUv.y * 30.0 + uTime;
+// Столбы по бокам
+function SideObjects() {
+  const meshRef = useRef();
+  const { speed, roadCurve } = useStore();
+  
+  // Создаем 20 столбов
+  const count = 20;
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  
+  // Позиции столбов (изначально)
+  const positions = useMemo(() => {
+    return new Array(count).fill(0).map((_, i) => ({
+      z: -(i * 20), // Каждые 20 метров
+      side: i % 2 === 0 ? 1 : -1 // Слева/Справа
+    }))
+  }, []);
+
+  useFrame((state, delta) => {
+    if (!meshRef.current) return;
+    
+    // Двигаем столбы
+    const moveDist = speed * delta * 0.3; // Конвертация скорости в метры
+
+    positions.forEach((pos, i) => {
+      pos.z += moveDist;
       
-      // Базовый цвет асфальта
-      vec3 col = vec3(0.08); 
+      // Если столб пролетел за спину, кидаем его вперед
+      if (pos.z > 5) pos.z = -300;
       
-      // Шум
-      float noise = fract(sin(dot(vUv * 100.0, vec2(12.9, 78.2))) * 43758.5);
-      col += noise * 0.02;
+      // Изгиб дороги
+      const curveX = Math.sin(pos.z * 0.01) * roadCurve;
+      
+      dummy.position.set((pos.side * 8) + curveX, 2, pos.z);
+      dummy.rotation.set(0, 0, 0);
+      dummy.updateMatrix();
+      meshRef.current.setMatrixAt(i, dummy.matrix);
+    });
+    meshRef.current.instanceMatrix.needsUpdate = true;
+  });
 
-      // Центральная полоса
-      float center = step(0.49, vUv.x) - step(0.51, vUv.x);
-      float dash = step(0.5, sin(y));
-      col += vec3(1.0, 0.9, 0.0) * center * dash;
+  return (
+    <instancedMesh ref={meshRef} args={[null, null, count]}>
+      <boxGeometry args={[0.5, 8, 0.5]} />
+      <meshStandardMaterial color="#333" emissive="#111" />
+    </instancedMesh>
+  );
+}
 
-      // Боковые линии
-      float sides = step(0.05, vUv.x) - step(0.07, vUv.x) + step(0.93, vUv.x) - step(0.95, vUv.x);
-      col += vec3(0.6) * sides;
+// Дорога
+function Road() {
+  const ref = useRef();
+  const { speed, roadCurve } = useStore();
+  
+  // Простой шейдер для анимации текстуры и изгиба
+  useFrame((state) => {
+     if(ref.current) {
+         ref.current.material.uniforms.uTime.value += speed * 0.0005;
+         ref.current.material.uniforms.uCurve.value = roadCurve;
+     }
+  });
 
-      // Туман (уход в черноту)
-      float fog = smoothstep(0.0, 0.8, vUv.y); 
-      col = mix(col, vec3(0.0), fog);
+  const shaderArgs = useMemo(() => ({
+    uniforms: { uTime: { value: 0 }, uCurve: { value: 0 } },
+    vertexShader: `
+      varying vec2 vUv;
+      uniform float uCurve;
+      void main() {
+        vUv = uv;
+        vec3 pos = position;
+        // Изгиб
+        float zFactor = pos.z - 5.0; // Начинаем гнуть от камеры
+        pos.x += uCurve * (zFactor * zFactor * 0.001);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+      }
+    `,
+    fragmentShader: `
+      varying vec2 vUv;
+      uniform float uTime;
+      void main() {
+        float y = vUv.y * 20.0 + uTime;
+        // Асфальт
+        vec3 col = vec3(0.1);
+        // Разметка
+        float dash = step(0.5, sin(y * 5.0));
+        float line = step(0.48, vUv.x) - step(0.52, vUv.x);
+        col += vec3(1.0, 0.8, 0.0) * line * dash;
+        // Туман (фейковый)
+        float fog = smoothstep(0.0, 0.4, vUv.y);
+        gl_FragColor = vec4(mix(col, vec3(0.0), fog), 1.0);
+      }
+    `
+  }), []);
 
-      gl_FragColor = vec4(col, 1.0);
-    }
-  `
-};
+  return (
+     <mesh rotation={[-Math.PI/2, 0, 0]} position={[0, -2, -50]}>
+        <planeGeometry args={[20, 200, 40, 40]} />
+        <shaderMaterial args={[shaderArgs]} />
+     </mesh>
+  );
+}
 
 export function Scene() {
-  const ref = useRef();
-  const { odometer, shake } = useStore();
-  
+  const { shake } = useStore();
   useFrame((state) => {
-    if (ref.current) {
-        ref.current.uniforms.uTime.value = odometer * 0.2;
-    }
-    // Тряска камеры (Pitch & Yaw)
-    state.camera.position.y = 1.5 + (Math.random()-0.5) * shake;
-    state.camera.position.x = (Math.random()-0.5) * shake * 0.5;
+     // Тряска камеры при скорости
+     state.camera.position.y = 1.5 + (Math.random()-0.5) * shake;
+     state.camera.position.x = (Math.random()-0.5) * shake * 0.5;
+     state.camera.lookAt(0, 0, -20);
   });
 
   return (
     <>
       <color attach="background" args={['#000']} />
-      
-      {/* Дорога (Опущена ниже, чтобы не перекрывать камеру) */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, -10]}>
-         <planeGeometry args={[20, 200, 20, 40]} />
-         <shaderMaterial ref={ref} attach="material" args={[RoadShader]} />
-      </mesh>
-      
-      {/* Фары */}
-      <spotLight position={[0, 1.5, 0]} angle={0.5} penumbra={0.5} intensity={50} distance={60} color="#fff" />
+      <fog attach="fog" args={['#000', 10, 100]} />
       <ambientLight intensity={0.2} />
+      <spotLight position={[0, 2, 0]} angle={0.8} intensity={50} distance={50} color="#fff" />
+      
+      <Road />
+      <SideObjects />
     </>
   );
 }
-

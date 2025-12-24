@@ -8,11 +8,11 @@
   --plastic-texture: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAIklEQVQIW2NkYGD4D8SMQAwGcAY2AbBKDBBCKBCIgWwAAMQDBywNJkt4AAAAAElFTkSuQmCC');
 }
 
-body { margin: 0; background: #000; overflow: hidden; font-family: 'Rajdhani', sans-serif; user-select: none; }
+body { margin: 0; background: #000; overflow: hidden; font-family: 'Rajdhani', sans-serif; user-select: none; -webkit-touch-callout: none; }
 #root { width: 100%; height: 100%; position: relative; }
 #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
 
-/* === 1. ИНТЕРЬЕР (РАМКА) === */
+/* === 1. ИНТЕРЬЕР === */
 .cockpit-overlay {
   position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10;
   display: flex; flex-direction: column; justify-content: flex-end;
@@ -21,16 +21,20 @@ body { margin: 0; background: #000; overflow: hidden; font-family: 'Rajdhani', s
 
 .windshield-frame {
   position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-  box-shadow: inset 0 0 50px rgba(0,0,0,1);
-  background: radial-gradient(circle at 50% 30%, transparent 60%, rgba(0,0,0,0.9) 100%);
+  box-shadow: inset 0 0 80px rgba(0,0,0,1);
+  background: radial-gradient(circle at 50% 40%, transparent 50%, rgba(0,0,0,0.95) 100%);
   pointer-events: none;
 }
-.pillar-left, .pillar-right {
-  position: absolute; top: 0; width: 10vw; height: 100%;
-  background: linear-gradient(90deg, #111, #050505);
+
+/* СООБЩЕНИЯ СИСТЕМЫ (ПОЛОМКА) */
+.system-msg {
+  position: absolute; top: 20%; left: 50%; transform: translate(-50%, -50%);
+  color: #ff3333; font-family: 'Orbitron', monospace; font-size: 24px; font-weight: 900;
+  background: rgba(0,0,0,0.8); padding: 15px 30px; border: 2px solid #ff3333;
+  text-transform: uppercase; letter-spacing: 2px;
+  animation: blink 0.2s infinite; z-index: 100; text-align: center;
+  box-shadow: 0 0 20px #ff3333;
 }
-.pillar-left { left: 0; transform: skewX(10deg) translateX(-50%); }
-.pillar-right { right: 0; transform: skewX(-10deg) translateX(50%); }
 
 /* === 2. ТОРПЕДО === */
 .dashboard-body {
@@ -39,135 +43,122 @@ body { margin: 0; background: #000; overflow: hidden; font-family: 'Rajdhani', s
   background-image: var(--plastic-texture);
   border-top: 4px solid #333;
   border-radius: 50% 50% 0 0 / 20px 20px 0 0;
-  box-shadow: 0 -10px 30px #000;
+  box-shadow: 0 -10px 50px #000;
   pointer-events: auto;
   display: flex; justify-content: center; align-items: flex-end;
   padding-bottom: 20px;
 }
 
-/* КОЗЫРЕК (CLUSTER HOOD) */
 .cluster-hood {
   position: absolute; bottom: 20%;
-  width: 90%; max-width: 600px; height: 60%;
-  background: linear-gradient(to bottom, #111, #1a1a1a);
+  width: 95%; max-width: 650px; height: 65%;
+  background: linear-gradient(to bottom, #0f0f0f, #1a1a1a);
   border: 2px solid #333; border-bottom: none;
   border-radius: 40px 40px 0 0;
-  box-shadow: inset 0 10px 20px #000;
+  box-shadow: inset 0 10px 30px #000;
   display: flex; justify-content: space-around; align-items: center;
-  padding: 0 20px;
+  padding: 0 10px;
 }
 
-/* === 3. ПРИБОРЫ (GAUGES) === */
+/* === 3. ПРИБОРЫ === */
 .gauge-well {
   width: 140px; height: 140px;
-  background: #000;
-  border-radius: 50%;
+  background: #000; border-radius: 50%;
   border: 4px solid #2a2a2a;
-  box-shadow: inset 0 0 20px #000, 0 5px 10px rgba(0,0,0,0.5);
+  box-shadow: inset 0 0 20px #000;
   position: relative;
 }
 
 .gauge-face {
   width: 100%; height: 100%; border-radius: 50%;
   background: radial-gradient(#151515, #000);
-  position: relative; opacity: 0.4; transition: opacity 0.5s;
+  position: relative; opacity: 0.3; transition: opacity 0.8s;
 }
 .gauge-face.lit { opacity: 1; }
 
-/* НАСЕЧКИ (TICKS) */
 .ticks-rpm, .ticks-speed {
   position: absolute; top:0; left:0; width:100%; height:100%; border-radius: 50%;
-  background: repeating-conic-gradient(from -150deg, transparent 0deg, transparent 4deg, #444 5deg, transparent 6deg);
-  mask-image: radial-gradient(transparent 65%, black 66%);
+  background: repeating-conic-gradient(from -150deg, transparent 0deg, transparent 4deg, #555 5deg, transparent 6deg);
   -webkit-mask-image: radial-gradient(transparent 65%, black 66%);
-  transform: rotate(0deg);
+  mask-image: radial-gradient(transparent 65%, black 66%);
 }
-/* Красная зона */
-.ticks-rpm { background: repeating-conic-gradient(from -150deg, transparent 0deg, transparent 4deg, #fff 5deg, transparent 6deg, transparent 230deg, #d00 231deg, #d00 232deg, transparent 233deg); }
+.ticks-rpm { 
+  background: repeating-conic-gradient(from -150deg, transparent 0deg, transparent 4deg, #eee 5deg, transparent 6deg, transparent 230deg, #d00 231deg, #d00 232deg, transparent 233deg); 
+}
 
-.gauge-label {
+.label {
   position: absolute; bottom: 25%; width: 100%; text-align: center;
   color: #666; font-size: 10px; font-weight: 700; letter-spacing: 1px;
 }
-.gauge-value {
+.val-display {
   position: absolute; bottom: 40%; width: 100%; text-align: center;
   color: #fff; font-family: 'Orbitron', monospace; font-size: 18px;
-  text-shadow: 0 0 5px rgba(255,255,255,0.5);
+  text-shadow: 0 0 5px rgba(255,255,255,0.3);
 }
 
-/* СТРЕЛКИ */
-.needle-container {
-  position: absolute; top:0; left:0; width:100%; height:100%;
-  transition: transform 0.1s cubic-bezier(0.1, 0, 0.2, 1);
-}
 .needle {
   position: absolute; top: 15%; left: 50%; width: 4px; height: 35%;
   background: #ff3333; transform: translateX(-50%);
-  border-radius: 2px; z-index: 2;
+  border-radius: 2px; z-index: 2; box-shadow: 0 0 5px red;
 }
-.needle.orange { background: #ff9d00; }
-.needle-glow {
-  position: absolute; top: 15%; left: 50%; width: 4px; height: 35%;
-  background: #ff3333; transform: translateX(-50%);
-  filter: blur(4px); opacity: 0.8;
-}
+.needle.orange { background: #ff9d00; box-shadow: 0 0 5px orange; }
 
-/* СТЕКЛО */
 .gauge-glass {
   position: absolute; top:0; left:0; width:100%; height:100%; border-radius: 50%;
   background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 40%, rgba(255,255,255,0.05) 100%);
   pointer-events: none; z-index: 5;
 }
 
-/* === 4. ЦЕНТРАЛЬНАЯ КОНСОЛЬ === */
-.center-stack {
-  display: flex; flex-direction: column; align-items: center; gap: 10px;
-}
+/* === 4. ЦЕНТР === */
+.center-stack { display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .digital-readout {
   display: flex; flex-direction: column; align-items: center;
-  background: #000; padding: 5px 15px; border-radius: 10px;
-  border: 1px solid #333;
+  background: #000; padding: 5px 20px; border-radius: 8px; border: 1px solid #333;
 }
-.gear-big { font-family: 'Orbitron'; font-size: 32px; color: #fff; font-weight: bold; }
-.gear-label { font-size: 10px; color: #666; }
-.temp-label { font-size: 12px; color: #0f0; margin-top: 5px; }
-.temp-label.warning { color: #f00; animation: blink 0.5s infinite; }
+.gear-big { font-family: 'Orbitron'; font-size: 36px; color: #fff; font-weight: bold; }
+.temp-label { font-size: 12px; color: #0f0; margin-top: 5px; font-weight: bold; }
+.temp-label.warning { color: #f00; animation: blink 0.2s infinite; }
 
-.switch-row { display: flex; gap: 10px; }
+.switch-row { display: flex; gap: 15px; }
 .car-btn {
-  width: 50px; height: 50px; border-radius: 50%;
+  width: 55px; height: 55px; border-radius: 50%;
   background: linear-gradient(#222, #111);
   border: 2px solid #444; color: #555; font-weight: bold; font-size: 9px;
-  cursor: pointer; box-shadow: 0 4px 6px #000;
+  cursor: pointer; box-shadow: 0 4px 10px #000; transition: all 0.1s;
 }
-.car-btn:active { transform: translateY(2px); box-shadow: 0 1px 2px #000; }
-.car-btn.on { border-color: #0f0; color: #0f0; box-shadow: 0 0 10px #0f0; }
-.car-btn.active { border-color: #ff9d00; color: #ff9d00; box-shadow: 0 0 10px #ff9d00; }
-.car-btn.nitro.active { border-color: #00ccff; color: #00ccff; box-shadow: 0 0 15px #00ccff; }
+.car-btn:active { transform: translateY(2px); }
+.car-btn.on { border-color: #0f0; color: #0f0; box-shadow: 0 0 15px rgba(0,255,0,0.3); }
+.car-btn.active { border-color: #ff9d00; color: #ff9d00; box-shadow: 0 0 15px rgba(255,157,0,0.3); }
+.car-btn.nitro.active { border-color: #00ccff; color: #00ccff; box-shadow: 0 0 20px #00ccff; }
 
 /* === 5. ПЕДАЛИ === */
-.pedals-area {
+.controls {
   position: absolute; bottom: 20px; width: 100%;
-  display: flex; justify-content: space-between; padding: 0 40px;
+  display: flex; justify-content: space-between; padding: 0 30px;
   pointer-events: none; z-index: 20;
 }
 .pedal-box { pointer-events: auto; display: flex; flex-direction: column; align-items: center; }
 .pedal {
-  width: 80px; height: 180px;
-  background: #151515; border: 2px solid #333; border-radius: 8px;
-  position: relative; overflow: hidden;
-  box-shadow: 0 5px 20px #000;
+  width: 85px; height: 200px;
+  background: #111; border: 2px solid #333; border-radius: 10px;
+  position: relative; overflow: hidden; box-shadow: 0 10px 30px #000;
 }
 .pedal-tread {
-  width: 100%; height: 100%;
+  width: 100%; height: 100%; opacity: 0.2;
   background: repeating-linear-gradient(0deg, transparent, transparent 10px, #000 11px, #000 12px);
-  opacity: 0.3; pointer-events: none;
+  pointer-events: none;
 }
 .pedal-pressure {
   position: absolute; bottom: 0; left: 0; width: 100%;
   background: linear-gradient(to top, #ff9d00, transparent);
-  opacity: 0.6; transition: height 0.05s linear;
+  opacity: 0.8; transition: height 0.05s linear;
 }
-.pedal-label { margin-top: 10px; color: #444; font-weight: bold; font-size: 14px; }
+.pedal-label { margin-top: 10px; color: #666; font-weight: bold; font-size: 14px; letter-spacing: 1px; }
 
-@keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } 
+/* АНИМАЦИИ */
+@keyframes blink { 
+  0% { opacity: 1; } 
+  50% { opacity: 0.3; } 
+  100% { opacity: 1; } 
+}
+

@@ -1,7 +1,7 @@
 {
-  "name": "night-drive-3",
+  "name": "night-drive-ultimate",
   "private": true,
-  "version": "0.0.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,11 +12,12 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "three": "^0.160.0",
-    "@react-three/fiber": "^8.15.0",
-    "@react-three/drei": "^9.96.0",
+    "@react-three/fiber": "^8.15.12",
+    "@react-three/drei": "^9.96.1",
     "@react-three/postprocessing": "^2.16.0",
     "zustand": "^4.5.0",
-    "leva": "^0.9.35"
+    "simplex-noise": "^4.0.1",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",

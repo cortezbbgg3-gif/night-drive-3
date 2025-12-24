@@ -1,96 +1,83 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { EffectComposer, Bloom } from '@react-three/postprocessing';
+import { EffectComposer, Bloom, Vignette, Noise } from '@react-three/postprocessing';
 import { useStore } from './store';
 import { Scene } from './Scene';
 import { AudioEngine } from './AudioEngine';
 import './styles.css';
 
-// --- КОМПОНЕНТ ПРИБОРНОЙ ПАНЕЛИ (HTML) ---
+// --- UI КОМПОНЕНТ ---
 const DashboardUI = () => {
-  const { rpm, speed, gear, lights, ignition, engineRunning, gasInput, brakeInput, setGas, setBrake, startEngine, toggleLights } = useStore();
-  
-  // Вычисляем поворот стрелок (CSS rotate)
-  // RPM: 0 = -130deg, 8000 = +130deg
+  const { rpm, speed, lights, ignition, engineRunning, setGas, setBrake, startEngine, toggleLights } = useStore();
+  // Состояния для визуального эффекта нажатия педалей
+  const [gasPressed, setGasPressed] = useState(false);
+  const [brakePressed, setBrakePressed] = useState(false);
+
+  // Углы поворота стрелок
   const rpmDeg = -130 + (rpm / 8000) * 260;
-  // Speed: 0 = -130deg, 220 = +130deg
   const speedDeg = -130 + (speed / 240) * 260;
 
-  // Хендлеры для педалей
-  const handlePedal = (type, val) => {
-      if(type === 'gas') setGas(val);
-      if(type === 'brake') setBrake(val);
+  const handlePedal = (type, pressed) => {
+      if(type === 'gas') { setGas(pressed ? 1 : 0); setGasPressed(pressed); }
+      if(type === 'brake') { setBrake(pressed ? 1 : 0); setBrakePressed(pressed); }
   };
 
   return (
     <div className="ui-layer">
-      {/* 2D DASHBOARD */}
-      <div className="dashboard">
-        
-        {/* КНОПКИ ЦЕНТРА */}
-        <div className="center-console">
-            <div className={`btn-car btn-start ${engineRunning ? 'on' : ''}`} onClick={startEngine}>
+      <div className="dashboard-container">
+        <div className="dashboard-bg" /> {/* Текстурированный фон */}
+
+        {/* Кнопки Start/Lights */}
+        <div className="center-controls">
+            <div className={`btn btn-start ${engineRunning ? 'active' : ''}`} onClick={startEngine}>
                 START<br/>ENGINE
             </div>
-            <div className={`btn-car ${lights ? 'active' : ''}`} onClick={toggleLights}>
+            <div className={`btn btn-lights ${lights ? 'active' : ''}`} onClick={toggleLights}>
                 LIGHTS
             </div>
         </div>
 
-        <div className="cluster">
-            {/* ТАХОМЕТР */}
-            <div className={`gauge ${ignition ? 'lit' : ''}`}>
-                <div className="dial-face" />
-                <div className="gauge-label">RPM</div>
-                <div className={`gauge-value ${ignition ? 'visible' : ''}`}>{Math.round(rpm)}</div>
-                
-                {/* Стрелка вращается через CSS */}
-                <div className="needle-container" style={{ transform: `rotate(${rpmDeg}deg)` }}>
+        {/* Приборы */}
+        <div className={`cluster ${ignition ? 'lit' : ''}`}>
+            {/* RPM */}
+            <div className="gauge">
+                <div className="gauge-label">RPM x1000</div>
+                <div className="gauge-value">{(rpm/1000).toFixed(1)}</div>
+                <div className="needle-wrapper" style={{ transform: `rotate(${rpmDeg}deg)` }}>
                     <div className="needle" />
                     <div className="needle-cap" />
                 </div>
-                {/* Маркеры (Ticks) */}
-                <div style={{position:'absolute', top: '10px', left:'50%', color:'red', fontSize:'10px'}}>x1000</div>
             </div>
-
-            {/* СПИДОМЕТР */}
-            <div className={`gauge ${ignition ? 'lit' : ''}`}>
-                <div className="dial-face" />
+            {/* SPEED */}
+            <div className="gauge">
                 <div className="gauge-label">KM/H</div>
-                <div className={`gauge-value ${ignition ? 'visible' : ''}`}>{Math.round(speed)}</div>
-                
-                <div className="needle-container" style={{ transform: `rotate(${speedDeg}deg)` }}>
-                    <div className="needle" style={{ background: '#ffaa00', boxShadow:'0 0 5px orange' }} />
+                <div className="gauge-value">{Math.round(speed)}</div>
+                <div className="needle-wrapper" style={{ transform: `rotate(${speedDeg}deg)` }}>
+                    <div className="needle" style={{ background: 'var(--primary-glow)', boxShadow:'0 0 8px var(--primary-glow)' }}/>
                     <div className="needle-cap" />
                 </div>
             </div>
         </div>
 
-        {/* ПЕДАЛИ */}
-        <div className="controls-area">
-            {/* ТОРМОЗ */}
-            <div className="pedal-wrapper" 
-                 onTouchStart={() => handlePedal('brake', 1)} 
-                 onTouchEnd={() => handlePedal('brake', 0)}
-                 onMouseDown={() => handlePedal('brake', 1)} 
-                 onMouseUp={() => handlePedal('brake', 0)}
+        {/* Педали (Напольные) */}
+        <div className="pedals-container">
+            <div className={`pedal-box ${brakePressed ? 'pressed' : ''}`}
+                 onTouchStart={() => handlePedal('brake', true)} 
+                 onTouchEnd={() => handlePedal('brake', false)}
+                 onMouseDown={() => handlePedal('brake', true)} 
+                 onMouseUp={() => handlePedal('brake', false)}
             >
-                <div className="pedal">
-                    <div className="pedal-fill" style={{ height: `${brakeInput * 100}%` }} />
-                </div>
+                <div className="pedal-plate" />
                 <span className="pedal-label">BRAKE</span>
             </div>
 
-            {/* ГАЗ */}
-            <div className="pedal-wrapper"
-                 onTouchStart={() => handlePedal('gas', 1)} 
-                 onTouchEnd={() => handlePedal('gas', 0)}
-                 onMouseDown={() => handlePedal('gas', 1)} 
-                 onMouseUp={() => handlePedal('gas', 0)}
+            <div className={`pedal-box ${gasPressed ? 'pressed' : ''}`}
+                 onTouchStart={() => handlePedal('gas', true)} 
+                 onTouchEnd={() => handlePedal('gas', false)}
+                 onMouseDown={() => handlePedal('gas', true)} 
+                 onMouseUp={() => handlePedal('gas', false)}
             >
-                <div className="pedal">
-                    <div className="pedal-fill" style={{ height: `${gasInput * 100}%` }} />
-                </div>
+                <div className="pedal-plate" />
                 <span className="pedal-label">GAS</span>
             </div>
         </div>
@@ -103,30 +90,31 @@ const DashboardUI = () => {
 // Физический цикл
 const GameLoop = () => {
     const updatePhysics = useStore(s => s.updatePhysics);
-    useFrame((_, dt) => {
-        updatePhysics(dt);
-    });
+    useFrame((_, dt) => updatePhysics(dt));
     return null;
 }
 
 export default function App() {
   return (
     <>
-      {/* 1. Canvas - Это 3D мир (Дорога) */}
+      {/* 1. 3D Мир (На заднем плане, на весь экран) */}
       <div className="canvas-layer">
-          <Canvas camera={{ position: [0, 1.5, 3], fov: 75 }}>
+          <Canvas camera={{ position: [0, 1.2, 4], fov: 65 }} dpr={[1, 1.5]}>
             <Scene />
             <GameLoop />
-            <EffectComposer>
-                <Bloom luminanceThreshold={0.2} intensity={1.5} />
+            {/* Пост-обработка для киношности */}
+            <EffectComposer disableNormalPass>
+                <Bloom luminanceThreshold={0.1} intensity={1.0} levels={9} mipmapBlur />
+                <Noise opacity={0.05} /> { /* Легкая зернистость пленки */ }
+                <Vignette offset={0.3} darkness={0.7} /> { /* Затемнение углов */ }
             </EffectComposer>
           </Canvas>
       </div>
 
-      {/* 2. UI - Приборка и кнопки поверх всего */}
+      {/* 2. 2D Интерфейс (Поверх всего) */}
       <DashboardUI />
       
-      {/* 3. Звук (невидим) */}
+      {/* 3. Звук */}
       <AudioEngine />
     </>
   );

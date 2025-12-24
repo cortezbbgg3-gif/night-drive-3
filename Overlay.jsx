@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useStore } from './store';
-import './overlay.css'; // Assume basic CSS
+import './styles.css';
 
 export function Overlay() {
   const { setGas, setBrake, isEngineOn, toggleEngine } = useStore();

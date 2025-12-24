@@ -1,223 +1,201 @@
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Audiowide&display=swap');
 
 :root {
-  --glow-color: #ff3300; /* Янтарный цвет BMW/Audi 90-х */
-  --glass-reflection: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 50%);
+  /* Цветовая схема: Янтарный/Оранжевый (BMW style) */
+  --primary-glow: #ff9d00; 
+  --secondary-glow: #ff3c00;
+  --off-color: #333;
+  --bg-texture: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAIklEQVQIW2NkYGD4D8SMQAwGcAY2AbBKDBBCKBCIgWwAAMQDBywNJkt4AAAAAElFTkSuQmCC'); /* Тонкая текстура шума */
 }
 
-* { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
-
+* { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
 body { margin: 0; background: #000; overflow: hidden; font-family: 'Rajdhani', sans-serif; }
 
-/* КОНТЕЙНЕРЫ */
-#root { width: 100%; height: 100%; position: relative; }
-.canvas-layer { position: absolute; top: 0; left: 0; width: 100%; height: 60%; z-index: 1; }
-.ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
+#root { width: 100%; height: 100%; position: relative; background: #000; }
 
-/* ПРИБОРНАЯ ПАНЕЛЬ (DASHBOARD) */
-.dashboard {
+/* СЛОИ */
+.canvas-layer {
   position: absolute;
-  bottom: 0;
-  left: 0;
+  top: 0; left: 0; width: 100%; height: 100%;
+  z-index: 0; /* 3D мир на заднем плане */
+}
+
+.ui-layer {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  z-index: 10;
+  pointer-events: none; /* Чтобы клики проходили к кнопкам */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end; /* Прижимаем панель вниз */
+  
+  /* Эффект лобового стекла: легкое затемнение сверху */
+  background: linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 60%);
+}
+
+/* === ПРИБОРНАЯ ПАНЕЛЬ === */
+.dashboard-container {
+  position: relative;
   width: 100%;
-  height: 45%; /* Занимает нижнюю часть экрана */
-  background: radial-gradient(circle at center, #1a1a1a 0%, #000000 100%);
-  border-top: 4px solid #333;
-  box-shadow: 0 -10px 50px rgba(0,0,0,0.8);
+  height: 50%; /* Занимает нижнюю половину */
+  pointer-events: auto;
   display: flex;
   justify-content: center;
-  align-items: center;
-  pointer-events: auto; /* Чтобы кнопки работали */
+  align-items: flex-end;
+  padding-bottom: 20px;
   perspective: 1000px;
 }
 
-/* КОЗЫРЕК ТОРПЕДЫ */
-.dashboard::before {
-  content: '';
+/* Фон торпеды с текстурой */
+.dashboard-bg {
   position: absolute;
-  top: -20px;
-  left: 10%;
-  width: 80%;
-  height: 20px;
-  background: #111;
+  bottom: -100px; /* Уходит за пределы экрана */
+  left: -10%;
+  width: 120%;
+  height: 120%;
+  background-color: #111;
+  background-image: var(--bg-texture);
+  border-top: 5px solid #222;
   border-radius: 50% 50% 0 0;
-  box-shadow: 0 -5px 10px #000;
+  box-shadow: inset 0 10px 50px rgba(0,0,0,0.8), 0 -5px 20px rgba(0,0,0,0.5);
+  transform: rotateX(20deg); /* Наклон панели */
+  z-index: -1;
 }
 
-/* ПРИБОРЫ (CLUSTER) */
+/* Группа приборов */
 .cluster {
   display: flex;
-  gap: 40px;
-  background: #050505;
-  padding: 20px 40px;
-  border-radius: 40px;
-  border: 2px solid #333;
-  box-shadow: inset 0 0 20px #000;
-  position: relative;
+  gap: 30px;
+  align-items: center;
+  background: rgba(20, 20, 20, 0.8); /* Полупрозрачный пластик */
+  backdrop-filter: blur(5px);
+  padding: 15px 30px;
+  border-radius: 60px;
+  border: 3px solid #333;
+  box-shadow: 0 10px 30px #000, inset 0 0 20px rgba(0,0,0,0.5);
+  transition: all 0.5s;
 }
 
-/* ЦИФЕРБЛАТЫ (GAUGES) */
+.cluster.lit {
+  border-color: #554030;
+  box-shadow: 0 10px 40px #000, inset 0 0 30px rgba(255, 157, 0, 0.1);
+}
+
+/* === ЦИФЕРБЛАТЫ (GAUGES) === */
 .gauge {
-  width: 160px;
-  height: 160px;
+  width: 150px; height: 150px;
   border-radius: 50%;
-  border: 4px solid #444;
-  background: radial-gradient(#222, #000);
+  border: 5px solid #222;
   position: relative;
-  box-shadow: inset 0 0 10px rgba(0,0,0,0.9);
+  background: radial-gradient(circle at center, #2a2a2a 0%, #000 100%);
+  box-shadow: inset 0 0 15px #000;
 }
 
-.gauge.lit { border-color: #555; box-shadow: 0 0 15px rgba(255, 100, 0, 0.2); }
-
-.dial-face {
-  position: absolute; width: 100%; height: 100%; border-radius: 50%;
-  background: url('https://img.icons8.com/ios/100/ffffff/speed.png') no-repeat center; /* Можно заменить на SVG разметку */
-  background-size: contain;
-  opacity: 0.3;
+.gauge::after { /* Блик на стекле */
+  content: ''; position: absolute; top:0; left:0; width:100%; height:100%; border-radius:50%;
+  background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%);
+  pointer-events: none;
 }
 
-/* ЦИФРЫ И МЕТКИ */
+.gauge.lit { border-color: #443020; }
+
 .gauge-label {
-  position: absolute;
-  bottom: 25%;
-  width: 100%;
-  text-align: center;
-  color: #fff;
-  font-family: 'Orbitron', sans-serif;
-  font-size: 14px;
-  opacity: 0.8;
+  position: absolute; bottom: 30%; width: 100%; text-align: center;
+  color: #666; font-size: 12px; font-weight: 700; letter-spacing: 1px;
 }
 
 .gauge-value {
-  position: absolute;
-  bottom: 10%;
-  width: 100%;
-  text-align: center;
-  color: var(--glow-color);
-  font-family: 'Orbitron', sans-serif;
-  font-size: 24px;
-  text-shadow: 0 0 10px var(--glow-color);
-  opacity: 0; /* Скрыто пока выключено */
-  transition: opacity 0.5s;
+  position: absolute; bottom: 12%; width: 100%; text-align: center;
+  color: var(--primary-glow); font-family: 'Audiowide', cursive; font-size: 22px;
+  text-shadow: 0 0 10px var(--primary-glow);
+  opacity: 0; transition: opacity 0.3s;
 }
-.gauge-value.visible { opacity: 1; }
+.cluster.lit .gauge-value { opacity: 1; }
 
-/* СТРЕЛКА (NEEDLE) */
-.needle-container {
-  position: absolute;
-  top: 0; left: 0; width: 100%; height: 100%;
-  transition: transform 0.1s linear; /* Плавность физики */
+/* Стрелка */
+.needle-wrapper {
+  position: absolute; top:0; left:0; width:100%; height:100%;
+  transition: transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1); /* Плавная физика */
 }
-
 .needle {
-  position: absolute;
-  bottom: 50%;
-  left: 50%;
-  width: 4px;
-  height: 45%;
-  background: #ff0000;
-  transform-origin: bottom center;
+  position: absolute; bottom: 50%; left: 50%;
+  width: 3px; height: 42%;
+  background: var(--secondary-glow);
   transform: translateX(-50%);
+  box-shadow: 0 0 8px var(--secondary-glow);
   border-radius: 2px;
-  box-shadow: 0 0 5px red;
 }
-
 .needle-cap {
-  position: absolute;
-  top: 50%; left: 50%;
-  width: 20px; height: 20px;
-  background: #333;
+  position: absolute; top:50%; left:50%; width: 18px; height: 18px;
+  background: #111; border: 2px solid #333; border-radius:50%;
+  transform: translate(-50%, -50%); z-index: 2;
+}
+.cluster.lit .needle-cap { border-color: #554030; }
+
+
+/* === КНОПКИ И ПЕДАЛИ === */
+.center-controls {
+  position: absolute; top: -80px; /* Над приборами */
+  display: flex; gap: 20px;
+}
+
+.btn {
+  width: 70px; height: 70px;
   border-radius: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 2;
+  border: 4px solid #333;
+  background: linear-gradient(#222, #111);
+  color: #777;
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  font-size: 10px; font-weight: bold;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.5), inset 0 2px 5px rgba(255,255,255,0.05);
+  cursor: pointer; transition: all 0.2s;
+}
+.btn:active { transform: scale(0.95); }
+
+.btn-start.active {
+  border-color: var(--secondary-glow); color: var(--secondary-glow);
+  background: linear-gradient(#300, #100);
+  box-shadow: 0 0 25px var(--secondary-glow), inset 0 0 10px var(--secondary-glow);
+  text-shadow: 0 0 5px var(--secondary-glow);
+}
+.btn-lights.active {
+  border-color: var(--primary-glow); color: var(--primary-glow);
+  box-shadow: 0 0 25px var(--primary-glow);
+  text-shadow: 0 0 5px var(--primary-glow);
 }
 
-/* ПЕДАЛИ И КНОПКИ */
-.controls-area {
-  position: absolute;
-  bottom: 20px;
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  padding: 0 40px;
-  pointer-events: none; /* Пропускаем клики сквозь контейнер */
+/* ПЕДАЛИ (Новый дизайн - напольные) */
+.pedals-container {
+  position: absolute; bottom: 20px; width: 100%;
+  display: flex; justify-content: space-between; padding: 0 30px;
 }
 
-.pedal-wrapper {
-  pointer-events: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
+.pedal-box {
+  display: flex; flex-direction: column; align-items: center;
+  position: relative; width: 90px; height: 160px;
 }
 
-.pedal {
-  width: 80px;
-  height: 180px;
-  background: #222;
-  border: 2px solid #555;
-  border-radius: 10px 10px 40px 40px; /* Форма педали */
-  position: relative;
-  overflow: hidden;
-  box-shadow: 0 10px 20px #000;
-  transition: transform 0.1s;
-}
-
-.pedal:active { transform: scale(0.95); }
-
-.pedal-fill {
-  position: absolute;
-  bottom: 0; left: 0;
-  width: 100%;
-  background: linear-gradient(0deg, var(--glow-color) 0%, #550000 100%);
-  transition: height 0.05s linear;
-}
-
-.pedal-label { color: #888; font-weight: bold; font-size: 18px; }
-
-/* ЦЕНТРАЛЬНАЯ КОНСОЛЬ (КНОПКИ) */
-.center-console {
-  position: absolute;
-  bottom: 50%;
-  left: 50%;
-  transform: translate(-50%, 50%);
-  display: flex;
-  gap: 20px;
-  pointer-events: auto;
-  z-index: 50;
-}
-
-.btn-car {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
+.pedal-plate {
+  width: 100%; height: 100%;
+  background: linear-gradient(#333, #111);
   border: 3px solid #444;
-  background: #222;
-  color: #fff;
-  font-weight: bold;
-  cursor: pointer;
-  box-shadow: 0 5px 15px #000;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  font-size: 10px;
+  border-radius: 8px;
+  transform-origin: bottom center; /* Вращение от пола */
+  transform: perspective(500px) rotateX(0deg);
+  transition: transform 0.1s ease-out, border-color 0.2s;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.7);
+  /* Текстура металла */
+  background-image: repeating-linear-gradient(90deg, transparent 0, transparent 10px, rgba(0,0,0,0.5) 10px, rgba(0,0,0,0.5) 12px);
 }
 
-.btn-car.active {
-  border-color: var(--glow-color);
-  box-shadow: 0 0 20px var(--glow-color);
-  color: var(--glow-color);
+/* Эффект нажатия */
+.pedal-box.pressed .pedal-plate {
+  transform: perspective(500px) rotateX(30deg) translateY(5px); /* Уходит в пол */
+  border-color: #666;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.9);
 }
 
-.btn-start {
-  border-color: #a00;
-  background: radial-gradient(#500, #200);
+.pedal-label {
+  margin-top: 10px; color: #888; font-weight: bold; font-size: 16px;
+  text-shadow: 0 2px 2px #000;
 }
-.btn-start.on {
-  background: radial-gradient(#0f0, #050);
-  border-color: #0f0;
-  box-shadow: 0 0 30px #0f0;
-}
-
-.screen-blur { backdrop-filter: blur(2px); }

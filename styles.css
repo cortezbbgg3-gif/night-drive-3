@@ -4,120 +4,257 @@
   --neon-orange: #ff9d00;
   --neon-red: #ff3333;
   --neon-blue: #00ccff;
-  --glass: rgba(10, 10, 10, 0.85);
+  --neon-green: #00ff00;
+  --glass-bg: rgba(15, 15, 15, 0.95);
+  --border-col: #333;
 }
 
-* { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
-body { margin: 0; background: #000; overflow: hidden; font-family: 'Chakra Petch', sans-serif; }
+/* СБРОС И БАЗА */
+* { 
+  box-sizing: border-box; 
+  user-select: none; 
+  -webkit-tap-highlight-color: transparent; 
+  -webkit-touch-callout: none;
+}
+
+body { 
+  margin: 0; 
+  background: #000; 
+  overflow: hidden; 
+  font-family: 'Chakra Petch', sans-serif;
+  overscroll-behavior: none;
+}
 
 #root { width: 100%; height: 100%; position: relative; }
 
-/* 3D СЛОЙ */
-.canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-
-/* UI СЛОЙ */
-.ui-overlay {
-  position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10;
-  pointer-events: none;
-  display: flex; flex-direction: column; justify-content: flex-end;
+/* 3D СЛОЙ (ЗАДНИЙ ПЛАН) */
+.canvas-container { 
+  position: absolute; 
+  top: 0; left: 0; 
+  width: 100%; height: 100%; 
+  z-index: 1; 
 }
 
-/* ВИНЬЕТКА (менее агрессивная) */
+/* UI СЛОЙ (ИНТЕРФЕЙС) */
+.ui-overlay {
+  position: absolute; 
+  top: 0; left: 0; 
+  width: 100%; height: 100%; 
+  z-index: 10;
+  pointer-events: none; /* Пропускаем клики сквозь пустые места */
+  display: flex; 
+  flex-direction: column; 
+  justify-content: flex-end; /* Прижимаем к низу */
+}
+
+/* ВИНЬЕТКА (АТМОСФЕРА) */
 .vignette {
   position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-  background: radial-gradient(circle, transparent 50%, rgba(0,0,0,0.9) 100%);
+  background: radial-gradient(circle, transparent 40%, rgba(0,0,0,0.8) 100%);
   pointer-events: none;
 }
 
-/* === ПРИБОРНАЯ ПАНЕЛЬ (АДАПТИВНАЯ) === */
+/* === ПРИБОРНАЯ ПАНЕЛЬ === */
 .dashboard {
-  position: relative; width: 100%; height: 45vmin; /* Высота зависит от экрана */
-  display: flex; justify-content: center; align-items: flex-end;
+  position: relative; 
+  width: 100%; 
+  height: 48vmin; /* Адаптивная высота */
+  display: flex; 
+  justify-content: center; 
+  align-items: flex-end;
   padding-bottom: 2vmin;
   pointer-events: auto;
-  perspective: 1000px;
+  perspective: 800px; /* Для 3D наклона панели */
 }
 
-/* ПЛАШКА ПРИБОРОВ */
+/* БЛОК ПРИБОРОВ (CLUSTER) */
 .cluster {
-  display: flex; align-items: flex-end; justify-content: center; gap: 4vmin;
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  gap: 3vmin;
   background: linear-gradient(to bottom, #222, #111);
-  padding: 2vmin 4vmin;
+  padding: 3vmin 5vmin;
   border-radius: 4vmin 4vmin 0 0;
-  border-top: 0.5vmin solid #333;
-  box-shadow: 0 -1vmin 5vmin rgba(0,0,0,0.8);
-  transform: rotateX(10deg);
+  border-top: 0.5vmin solid var(--border-col);
+  box-shadow: 0 -1vmin 5vmin rgba(0,0,0,0.9);
+  transform: rotateX(15deg); /* Наклон "от себя" */
+  transition: border-color 0.3s;
 }
-.cluster.lit { border-color: var(--neon-orange); box-shadow: 0 -1vmin 5vmin rgba(255, 150, 0, 0.15); }
 
-/* ДАТЧИКИ */
-.gauge {
-  width: 18vmin; height: 18vmin; /* Размер в % от экрана */
-  border-radius: 50%; border: 0.8vmin solid #333;
-  background: radial-gradient(#1a1a1a, #000);
-  position: relative;
-  display: flex; justify-content: center; align-items: center;
+/* ПОДСВЕТКА ВКЛЮЧЕНА */
+.cluster.lit { 
+  border-color: var(--neon-orange); 
+  box-shadow: 0 -1vmin 5vmin rgba(255, 150, 0, 0.15); 
 }
-.cluster.lit .gauge { border-color: #555; box-shadow: 0 0 2vmin var(--neon-orange); }
+
+/* === ДАТЧИКИ (GAUGES) === */
+.gauge {
+  width: 18vmin; 
+  height: 18vmin; 
+  border-radius: 50%; 
+  border: 0.8vmin solid #222;
+  background: radial-gradient(circle, #1a1a1a 0%, #000 100%);
+  position: relative;
+  display: flex; 
+  justify-content: center; 
+  align-items: center;
+  box-shadow: inset 0 0 2vmin #000;
+}
+
+.cluster.lit .gauge { 
+  border-color: #444; 
+  box-shadow: 0 0 3vmin rgba(255, 157, 0, 0.2); 
+}
 
 .gauge-val {
-  font-family: 'Orbitron', monospace; font-size: 4vmin; color: var(--neon-orange);
-  text-shadow: 0 0 1vmin var(--neon-orange); z-index: 2;
+  font-family: 'Orbitron', monospace; 
+  font-size: 4.5vmin; 
+  color: var(--neon-orange);
+  text-shadow: 0 0 1.5vmin var(--neon-orange); 
+  z-index: 2;
 }
+
 .gauge-label {
-  position: absolute; bottom: 20%; font-size: 1.5vmin; color: #666; font-weight: bold;
+  position: absolute; 
+  bottom: 20%; 
+  font-size: 1.5vmin; 
+  color: #666; 
+  font-weight: bold;
+  letter-spacing: 0.1vmin;
 }
 
 /* СТРЕЛКИ */
 .needle {
-  position: absolute; top: 0; left: 50%; width: 0.6vmin; height: 50%;
-  background: var(--neon-red); transform-origin: bottom center;
-  box-shadow: 0 0 1vmin red; transition: transform 0.05s linear; z-index: 1;
+  position: absolute; 
+  top: 0; left: 50%; 
+  width: 0.5vmin; height: 50%;
+  background: var(--neon-red); 
+  transform-origin: bottom center;
+  box-shadow: 0 0 1vmin red; 
+  transition: transform 0.05s cubic-bezier(0.1, 0.7, 1.0, 0.1); 
+  z-index: 1;
+  border-radius: 0.5vmin;
 }
 
 /* ЦЕНТРАЛЬНАЯ ИНФО */
 .info-box {
-  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
-  height: 15vmin;
+  display: flex; 
+  flex-direction: column; 
+  align-items: center; 
+  justify-content: center;
+  width: 12vmin;
 }
-.gear-num { font-size: 8vmin; color: #fff; font-weight: bold; line-height: 1; text-shadow: 0 0 2vmin white; }
 
-/* === УПРАВЛЕНИЕ === */
+.gear-num { 
+  font-family: 'Orbitron', sans-serif;
+  font-size: 8vmin; 
+  color: #fff; 
+  font-weight: bold; 
+  line-height: 1; 
+  text-shadow: 0 0 2vmin white; 
+}
+
+/* === УПРАВЛЕНИЕ (ПЕДАЛИ И КНОПКИ) === */
 .controls-area {
-  position: absolute; bottom: 2vmin; width: 100%;
-  display: flex; justify-content: space-between; padding: 0 4vmin;
+  position: absolute; 
+  bottom: 2vmin; 
+  width: 100%;
+  display: flex; 
+  justify-content: space-between; 
+  padding: 0 5vmin;
   pointer-events: none;
 }
 
-/* ПЕДАЛИ (СЛАЙДЕРЫ) */
+/* КОНТЕЙНЕР ПЕДАЛИ */
 .pedal-container {
-  pointer-events: auto; display: flex; flex-direction: column; align-items: center; gap: 1vmin;
-}
-.pedal {
-  width: 12vmin; height: 25vmin; /* Адаптивный размер */
-  background: #151515; border: 0.4vmin solid #444; border-radius: 1vmin;
-  position: relative; overflow: hidden;
-  box-shadow: 0 1vmin 2vmin #000;
-  touch-action: none; /* ВАЖНО: Блокирует скролл браузера при слайде */
-}
-.pedal-fill {
-  position: absolute; bottom: 0; left: 0; width: 100%;
-  background: linear-gradient(0deg, var(--neon-orange), #ff4500);
-  transition: height 0.05s linear;
+  pointer-events: auto; 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center; 
+  gap: 1vmin;
 }
 
-/* КНОПКИ */
+/* САМА ПЕДАЛЬ (ТРЕК) */
+.pedal {
+  width: 12vmin; 
+  height: 28vmin; 
+  background: #111; 
+  border: 0.4vmin solid #444; 
+  border-radius: 1.5vmin;
+  position: relative; 
+  overflow: hidden;
+  box-shadow: 0 1vmin 3vmin #000;
+  touch-action: none; /* ВАЖНО: Блокирует скролл при слайде */
+}
+
+/* ЗАПОЛНЕНИЕ ПЕДАЛИ (СЛАЙДЕР) */
+.pedal-fill {
+  position: absolute; 
+  bottom: 0; left: 0; 
+  width: 100%;
+  background: linear-gradient(0deg, var(--neon-orange), #ff4500);
+  transition: height 0.05s linear;
+  box-shadow: 0 0 2vmin var(--neon-orange);
+}
+
+/* КНОПКИ ЦЕНТРАЛЬНЫЕ */
 .btn-grp {
-  position: absolute; bottom: 22vmin; left: 50%; transform: translateX(-50%);
-  display: flex; gap: 2vmin; pointer-events: auto;
+  position: absolute; 
+  bottom: 22vmin; /* Над приборкой */
+  left: 50%; 
+  transform: translateX(-50%);
+  display: flex; 
+  gap: 3vmin; 
+  pointer-events: auto;
+  z-index: 20;
 }
+
 .btn {
-  width: 10vmin; height: 10vmin; border-radius: 50%;
-  background: #222; border: 0.4vmin solid #444; color: #fff;
-  display: flex; justify-content: center; align-items: center;
-  font-size: 1.5vmin; font-weight: bold; cursor: pointer; text-align: center;
-  box-shadow: 0 0.5vmin 1vmin rgba(0,0,0,0.5);
+  width: 11vmin; 
+  height: 11vmin; 
+  border-radius: 50%;
+  background: radial-gradient(#222, #111); 
+  border: 0.4vmin solid #555; 
+  color: #888;
+  display: flex; 
+  justify-content: center; 
+  align-items: center;
+  font-size: 1.8vmin; 
+  font-weight: bold; 
+  cursor: pointer; 
+  text-align: center;
+  box-shadow: 0 0.5vmin 1vmin rgba(0,0,0,0.8);
+  transition: all 0.1s;
 }
-.btn.active { border-color: var(--neon-blue); box-shadow: 0 0 2vmin var(--neon-blue); color: var(--neon-blue); }
-.btn-start.on { border-color: #0f0; box-shadow: 0 0 2vmin #0f0; background: #051005; }
+
+.btn:active { transform: scale(0.95); }
+
+/* АКТИВНЫЕ СОСТОЯНИЯ КНОПОК */
+.btn-start.on { 
+  border-color: var(--neon-green); 
+  color: var(--neon-green);
+  box-shadow: 0 0 3vmin rgba(0, 255, 0, 0.4); 
+  background: radial-gradient(#052205, #000);
+}
+
+.btn.active { 
+  border-color: var(--neon-blue); 
+  color: var(--neon-blue);
+  box-shadow: 0 0 3vmin rgba(0, 204, 255, 0.4); 
+  text-shadow: 0 0 1vmin var(--neon-blue);
+}
+
+/* АНИМАЦИИ */
+@keyframes blink { 
+  0% { opacity: 1; } 
+  50% { opacity: 0.2; } 
+  100% { opacity: 1; } 
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 1vmin var(--neon-blue); }
+  50% { box-shadow: 0 0 3vmin var(--neon-blue); }
+  100% { box-shadow: 0 0 1vmin var(--neon-blue); }
+}
 

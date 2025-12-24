@@ -1,103 +1,136 @@
 import { create } from 'zustand';
 
+// Полезная математика для плавности (Linear Interpolation)
+const lerp = (start, end, t) => start * (1 - t) + end * t;
+
 export const useStore = create((set, get) => ({
-  // Controls (0.0 - 1.0)
-  gasPressure: 0,  // Сила нажатия газа
-  brakePressure: 0,
+  // --- USER INPUTS (Аналоговые 0.0 - 1.0) ---
+  gas: 0,
+  brake: 0,
   nitroActive: false,
   
-  // Car State
-  ignition: false,
-  engineRunning: false,
-  lights: false,
+  // --- CAR STATE ---
+  ignition: false,     // Включено ли зажигание (электрика)
+  engineRunning: false,// Заведен ли мотор
+  lights: false,       // Фары
   
-  // Physics
-  rpm: 0,       // 0 - 8000
-  speed: 0,     // 0 - 260 km/h
-  gear: 1,      // 1 - 6
-  odometer: 1240, // Пробег
+  // --- PHYSICS STATE ---
+  rpm: 0,              // Обороты (0 - 8000)
+  speed: 0,            // Скорость (0 - 300 km/h)
+  gear: 1,             // Передача (1 - 6)
+  turboPressure: 0,    // Давление турбины (0.0 - 1.0) для звука свиста
+  odometer: 1240,      // Пробег
+  shake: 0,            // Тряска камеры
   
-  // Visual Shake Factor (для эффектов)
-  shake: 0,
-
-  // Actions
-  setGas: (val) => set({ gasPressure: val }),
-  setBrake: (val) => set({ brakePressure: val }),
-  setNitro: (val) => set({ nitroActive: val }),
-  toggleLights: () => set(s => ({ lights: !s.lights })),
+  // --- ACTIONS ---
+  setGas: (val) => set({ gas: Math.max(0, Math.min(1, val)) }),
+  setBrake: (val) => set({ brake: Math.max(0, Math.min(1, val)) }),
+  setNitro: (active) => set({ nitroActive: active }),
+  toggleLights: () => set((state) => ({ lights: !state.lights })),
+  
   toggleIgnition: () => {
     const s = get();
-    if(s.engineRunning) {
-        set({ engineRunning: false, ignition: false, rpm: 0, speed: 0 });
+    if (s.engineRunning) {
+      // Глушим
+      set({ engineRunning: false, ignition: false, rpm: 0, turboPressure: 0 });
     } else {
-        set({ ignition: true });
-        // Заводим через 800мс
-        setTimeout(() => set({ engineRunning: true, rpm: 900 }), 800);
+      // Заводим (сначала электрика, через 0.8сек мотор)
+      set({ ignition: true });
+      setTimeout(() => {
+        // Проверка, не выключили ли зажигание в процессе
+        if (get().ignition) set({ engineRunning: true, rpm: 900 });
+      }, 800);
     }
   },
 
-  // === ФИЗИЧЕСКОЕ ЯДРО (ВЫЗЫВАЕТСЯ КАЖДЫЙ КАДР) ===
+  // --- PHYSICS ENGINE (60 FPS) ---
   updatePhysics: (dt) => {
     const s = get();
-    if (!s.engineRunning) return;
+    
+    // 1. Если мотор выключен, глушим всё
+    if (!s.engineRunning) {
+       if (s.rpm > 0) set({ rpm: Math.max(0, s.rpm - 2000 * dt), speed: Math.max(0, s.speed - 10 * dt) });
+       return;
+    }
 
-    // 1. КОНФИГУРАЦИЯ АВТО
-    const gearRatios = [0, 3.8, 2.4, 1.8, 1.4, 1.1, 0.9]; // Передаточные числа
-    const finalDrive = 3.5;
-    const maxRPM = 7500;
+    // --- КОНСТАНТЫ АВТОМОБИЛЯ ---
+    const maxRPM = 8000;
     const idleRPM = 900;
+    const horsePower = 400; // Мощность
+    // Передаточные числа (чем выше передача, тем меньше крутящий момент)
+    const gearRatios = [0, 3.2, 2.1, 1.6, 1.2, 0.9, 0.7]; 
     
-    // 2. РАСЧЕТ ОБОРОТОВ (RPM)
-    let targetRPM = s.rpm;
-    let torque = s.gasPressure * (s.nitroActive ? 2.5 : 1.0); // Нитро удваивает силу
+    // --- 2. ЛОГИКА ТУРБИНЫ (TURBO) ---
+    // Турбина раскручивается, только если газ > 0.4 и обороты > 3000
+    let targetTurbo = 0;
+    if (s.gas > 0.4 && s.rpm > 3000) targetTurbo = 1;
     
-    // Если газ нажат, обороты растут быстро, если нет - падают медленно
-    if (s.gasPressure > 0.1) {
-        targetRPM += torque * 4000 * dt; 
-    } else {
-        targetRPM -= (2000 + s.brakePressure * 5000) * dt;
-    }
-    
-    // Сцепление с дорогой (RPM зависит от скорости и передачи)
-    // Это эмуляция жесткой сцепки (Lock-up)
-    const wheelRPM = (s.speed / 200) * 8000; // Грубая конвертация
-    // Смешиваем "свободные" обороты и обороты от колес
-    // На нейтрали (или выжатом сцеплении при переключении) обороты свободны
-    
-    // ЛОГИКА ПЕРЕКЛЮЧЕНИЯ (АВТОМАТ)
+    // Инерция турбины (раскручивается медленно, сдувается быстро)
+    const turboLag = targetTurbo > s.turboPressure ? 0.5 : 2.0;
+    let newTurbo = lerp(s.turboPressure, targetTurbo, turboLag * dt);
+
+    // --- 3. РАСЧЕТ ОБОРОТОВ (RPM) ---
+    // Целевые обороты зависят от нажатия газа
+    // Если Нитро включено - обороты летят в отсечку
+    let targetRPM = idleRPM + (s.gas * (maxRPM - idleRPM));
+    if (s.nitroActive) targetRPM = maxRPM;
+
+    // Инерция двигателя (маховик): обороты не скачут мгновенно
+    let rpmSmoothness = s.gas > 0.1 ? 3 : 1; // Вверх быстро, вниз медленно
+    let newRPM = lerp(s.rpm, targetRPM, rpmSmoothness * dt);
+
+    // --- 4. КОРОБКА ПЕРЕДАЧ (AUTOMATIC) ---
     let nextGear = s.gear;
-    if (s.rpm > 7000 && s.gear < 6) {
-        // SHIFT UP
+    
+    // Переключение ВВЕРХ (Redline)
+    if (newRPM > 7200 && s.gear < 6) {
         nextGear++;
-        targetRPM -= 2500; // Обороты падают при повышении
-    } else if (s.rpm < 2000 && s.gear > 1 && s.speed > 10) {
-        // SHIFT DOWN
+        newRPM -= 2500; // Обороты падают при повышении передачи
+        newTurbo *= 0.5; // Турбина чуть сдувается (пшик)
+    } 
+    // Переключение ВНИЗ (Low RPM) - только если машина едет
+    else if (newRPM < 2200 && s.gear > 1 && s.speed > 15) {
         nextGear--;
-        targetRPM += 1500; // Подгазовка
+        newRPM += 1500; // Подскок оборотов (Rev match)
     }
 
-    // Ограничители
-    targetRPM = Math.max(idleRPM, Math.min(maxRPM + (Math.random()*100), targetRPM));
+    // Лимитер (отсечка)
+    newRPM = Math.min(newRPM, maxRPM + (Math.random() * 100));
 
-    // 3. РАСЧЕТ СКОРОСТИ
-    // Ускорение зависит от передачи (на 1-й мощно, на 6-й слабо)
-    const gearFactor = 1 / nextGear; 
-    const accel = (torque * 30 * gearFactor) - (s.brakePressure * 80) - (s.speed * 0.05); // 0.05 трение воздуха
+    // --- 5. СКОРОСТЬ И УСКОРЕНИЕ ---
+    // Сила ускорения = (Газ * Мощность * Турбо * Передача)
+    const gearMult = 1 / gearRatios[nextGear]; 
+    const nitroBoost = s.nitroActive ? 2.5 : 1.0;
+    const turboBoost = 1 + (newTurbo * 0.5); // +50% мощности от турбины
     
-    let nextSpeed = s.speed + accel * dt;
-    if (nextSpeed < 0) nextSpeed = 0;
+    // Главная формула разгона
+    const accelerationForce = (s.gas * horsePower * gearMult * turboBoost * nitroBoost);
+    
+    // Сопротивление (Тормоз + Воздух + Трение)
+    // Воздух (drag) растет квадратично от скорости
+    const airResistance = (s.speed * s.speed) * 0.006; 
+    const brakeForce = (s.brake * 1200);
+    const friction = 10;
 
-    // 4. ТРЯСКА (SHAKE)
-    // Трясет от скорости + очень сильно от НИТРО
-    let shakeVal = (nextSpeed / 300);
-    if (s.nitroActive) shakeVal += 0.1; // Рывок камеры
+    let totalForce = accelerationForce - brakeForce - airResistance - friction;
     
+    // Переводим силу в изменение скорости (F=ma)
+    let newSpeed = s.speed + (totalForce * 0.02 * dt);
+    
+    // Не даем ехать назад (для упрощения)
+    if (newSpeed < 0) newSpeed = 0;
+
+    // --- 6. ЭФФЕКТЫ (ТРЯСКА) ---
+    // Трясет от скорости + очень сильно от нитро + чуть-чуть от высоких оборотов
+    let shakeFactor = (newSpeed / 400) + (s.nitroActive ? 0.15 : 0) + (newRPM > 6000 ? 0.01 : 0);
+
     set({
-        rpm: targetRPM,
-        speed: nextSpeed,
-        gear: nextGear,
-        odometer: s.odometer + (nextSpeed * dt * 0.0002), // Наматываем пробег
-        shake: shakeVal
+      rpm: newRPM,
+      speed: newSpeed,
+      gear: nextGear,
+      turboPressure: newTurbo, // Это нужно для звука в AudioEngine!
+      odometer: s.odometer + (newSpeed * dt * 0.001),
+      shake: shakeFactor
     });
   }
 }));

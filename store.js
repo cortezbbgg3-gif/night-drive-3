@@ -1,74 +1,78 @@
 import { create } from 'zustand';
 
 export const useStore = create((set, get) => ({
-  // Inputs
+  // Controls
   gas: 0,
   brake: 0,
+  nitro: false,
+  lightsOn: false,
   
-  // Physics State
-  rpm: 800, // Idle
+  // Vehicle State
+  rpm: 800,
   speed: 0,
   gear: 1,
+  engineTemp: 50, // Градусы Цельсия
   distance: 0,
   isEngineOn: false,
   
   // Actions
-  setGas: (val) => set({ gas: val }),
-  setBrake: (val) => set({ brake: val }),
+  setGas: (val) => set({ gas: Math.max(0, Math.min(1, val)) }),
+  setBrake: (val) => set({ brake: Math.max(0, Math.min(1, val)) }),
+  setNitro: (val) => set({ nitro: val }),
+  toggleLights: () => set((state) => ({ lightsOn: !state.lightsOn })),
   toggleEngine: () => set((state) => ({ isEngineOn: !state.isEngineOn })),
   
-  // Physics Tick (вызывается каждый кадр внутри компонента)
+  // Physics Update Loop
   updatePhysics: (delta) => {
-    const { gas, brake, rpm, speed, gear, isEngineOn } = get();
-    if (!isEngineOn) return;
-
-    // Constants for "Old Car" feel
-    const maxRPM = 7000;
-    const idleRPM = 800;
-    const gearRatios = [0, 3.5, 2.5, 1.8, 1.4, 1.0]; // 1st to 5th
-    const finalDrive = 3.8;
-    
-    // 1. Calculate Target RPM based on Gas
-    // Если газ нажат, RPM стремится вверх. Если нет - падает.
-    let targetRPM = gas > 0 ? lerp(rpm, maxRPM, gas * delta * 2) : lerp(rpm, idleRPM, delta * 0.5);
-    
-    // 2. Load from Speed (Engine braking / Load)
-    // Реальная скорость влияет на RPM (сцепление)
-    const wheelCircumference = 2; // meters
-    const speedInRPM = (speed / 60) * gearRatios[gear] * finalDrive * 60; // rough conversion
-    
-    // Смешиваем "холостые" обороты и обороты от колес
-    let actualRPM = Math.max(idleRPM, targetRPM);
-    
-    // Shift Logic (Automatic)
-    let newGear = gear;
-    if (actualRPM > 6000 && gear < 5) {
-        newGear = gear + 1;
-        actualRPM = 4000; // Drop RPM on shift
-    } else if (actualRPM < 2000 && gear > 1) {
-        newGear = gear - 1;
-        actualRPM = 3500; // Rev match
+    const s = get();
+    if (!s.isEngineOn) {
+        // Если двигатель выключен, обороты падают до 0
+        if (s.rpm > 0) set({ rpm: Math.max(0, s.rpm - 1000 * delta) });
+        return;
     }
 
-    // 3. Calculate Speed
-    // Acceleration force depends on Torque (simplified as RPM curve)
-    const torque = (actualRPM > 1000 && actualRPM < 5000) ? 1.0 : 0.7;
-    const acceleration = (gas * torque * 50) / newGear; // Less accel at high gears
-    const deceleration = (brake * 80) + (speed * 0.05); // Drag + Brakes
-
-    let newSpeed = speed + (acceleration - deceleration) * delta;
+    // Параметры авто
+    const maxRPM = 8000;
+    const idleRPM = 900;
+    const powerFactor = s.nitro ? 3.0 : 1.0; // Нитро дает рывок
+    
+    // 1. Расчет оборотов (RPM)
+    // Газ поднимает обороты, но с инерцией (lerp)
+    let targetRPM = idleRPM + (s.gas * (maxRPM - idleRPM));
+    if (s.nitro) targetRPM = maxRPM; // Нитро кладет стрелку
+    
+    // Эмуляция нагрузки: если скорость растет, обороты растут медленнее
+    const load = s.speed / 200; 
+    const revSpeed = (s.gas * 5000 * powerFactor * (1 - load * 0.5)) * delta;
+    const revDrop = (2000 + s.brake * 3000) * delta;
+    
+    let newRPM = s.rpm;
+    if (s.gas > 0.05) {
+        newRPM += revSpeed;
+    } else {
+        newRPM -= revDrop;
+    }
+    
+    // Лимиты и дрожание стрелки (Noise)
+    newRPM = Math.max(idleRPM, Math.min(maxRPM, newRPM));
+    const jitter = (Math.random() - 0.5) * (s.rpm / 200); // Чем выше обороты, тем сильнее вибрация
+    
+    // 2. Расчет Скорости
+    // Скорость зависит от RPM и передачи (упрощенно)
+    const acceleration = (s.gas * 20 * powerFactor) - (s.brake * 60) - (s.speed * 0.1); // 0.1 - сопротивление воздуха
+    let newSpeed = s.speed + acceleration * delta;
     newSpeed = Math.max(0, newSpeed);
 
+    // 3. Температура
+    // Растет от высоких оборотов
+    let targetTemp = 90 + (s.rpm / maxRPM) * 30; // Рабочая ~90-120
+    let newTemp = s.engineTemp + (targetTemp - s.engineTemp) * delta * 0.05;
+
     set({ 
-      rpm: actualRPM + (Math.random() - 0.5) * 50, // Micro jitter
+      rpm: newRPM + jitter, 
       speed: newSpeed, 
-      gear: newGear,
-      distance: get().distance + newSpeed * delta
+      engineTemp: newTemp,
+      distance: s.distance + (newSpeed * delta)
     });
   }
 }));
-
-// Helper
-function lerp(start, end, t) {
-  return start * (1 - t) + end * t;
-}

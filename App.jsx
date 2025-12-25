@@ -6,22 +6,19 @@ import { Scene } from './Scene';
 import { AudioEngine } from './AudioEngine';
 import './styles.css';
 
-// Обновление физики
 const PhysicsSystem = () => {
   const update = useStore(s => s.updatePhysics);
   useFrame((_, dt) => update(Math.min(dt, 0.1)));
   return null;
 }
 
-// Компонент Прибора (Спидометр/Тахометр)
 const Gauge = ({ value, max, label, type }) => {
-  // Угол стрелки (-135 старт, +135 конец)
   const angle = -135 + (Math.min(value, max) / max) * 270;
 
   const renderTicks = () => {
     const ticks = [];
-    const stepBig = type === 'rpm' ? 1000 : 20; // Цифры каждые 20 км/ч
-    const stepSmall = type === 'rpm' ? 250 : 10; // Мелкие риски
+    const stepBig = type === 'rpm' ? 1000 : 20;
+    const stepSmall = type === 'rpm' ? 250 : 10;
     const total = type === 'rpm' ? 8000 : 280;
 
     for (let i = 0; i <= total; i += stepSmall) {
@@ -29,7 +26,6 @@ const Gauge = ({ value, max, label, type }) => {
         const deg = -135 + (pct * 270);
         const isBig = i % stepBig === 0;
 
-        // Риска
         ticks.push(
             <div key={`t-${i}`} 
                  className={`tick-mark ${isBig ? 'big' : 'small'}`} 
@@ -37,14 +33,11 @@ const Gauge = ({ value, max, label, type }) => {
             />
         );
 
-        // Цифра (позиционируем по радиусу)
         if (isBig) {
-            // Перевод градусов в радианы (с поправкой -90, т.к. 0 градусов это 3 часа)
             const rad = (deg - 90) * (Math.PI / 180);
-            const radius = 35; // Отступ цифр от центра (%)
+            const radius = 38; // Радиус цифр (%)
             const x = 50 + radius * Math.cos(rad);
             const y = 50 + radius * Math.sin(rad);
-            
             ticks.push(
                 <div key={`n-${i}`} className="tick-num" style={{ left: `${x}%`, top: `${y}%` }}>
                     {type === 'rpm' ? i/1000 : i}
@@ -60,12 +53,11 @@ const Gauge = ({ value, max, label, type }) => {
         <div className="gauge-face">
             {renderTicks()}
             <div className="gauge-info">
-                <div className="val-big">{type === 'rpm' ? (value/1000).toFixed(1) : Math.round(value)}</div>
+                <div className="val-big">{type==='rpm' ? (value/1000).toFixed(1) : Math.round(value)}</div>
                 <div className="val-label">{label}</div>
             </div>
-            {/* Стрелка */}
             <div className="needle-container" style={{ transform: `rotate(${angle}deg)` }}>
-                <div className="needle-arm" />
+                <div className={`needle ${type==='speed' ? 'orange' : ''}`} />
             </div>
             <div className="gauge-cap" />
         </div>
@@ -73,84 +65,71 @@ const Gauge = ({ value, max, label, type }) => {
   );
 };
 
-// Главный UI
 const Cockpit = () => {
-  const { 
-    rpm, speed, gear, temp, msg,
-    running, cranking, lights, nitro,
-    gas, brake,
-    setGas, setBrake, setNitro, 
-    toggleIgnition, toggleLights 
-  } = useStore();
+  const { rpm, speed, gear, temp, msg, running, cranking, lights, nitro, gas, brake, setGas, setBrake, setNitro, toggleIgnition, toggleLights } = useStore();
 
   const handleTouch = (e, type) => {
      if(e.cancelable) e.preventDefault();
      const t = e.touches ? e.touches[0] : e;
      const rect = e.currentTarget.getBoundingClientRect();
-     // 0 внизу, 1 вверху
      let val = (rect.bottom - t.clientY) / rect.height;
      val = Math.max(0, Math.min(1, val));
-     
-     if (type === 'gas') setGas(val);
-     if (type === 'brake') setBrake(val);
+     if(type === 'gas') setGas(val);
+     if(type === 'brake') setBrake(val);
   };
   const reset = (t) => { if(t==='gas') setGas(0); if(t==='brake') setBrake(0); };
 
   return (
     <div className="ui-layer">
-        <div className="vignette-frame" />
-        
+        {/* ИНТЕРЬЕР (СТОЙКИ, КРЫША) */}
+        <div className="interior-frame">
+            <div className="pillar-left" />
+            <div className="pillar-right" />
+            <div className="roof-shade" />
+        </div>
+
         {msg && <div className="warning-msg">{msg}</div>}
 
-        <div className="dashboard-wrapper">
-            <div className="gauges-row">
-                {/* ТАХОМЕТР */}
+        <div className="dashboard-body">
+            <div className="cluster-area">
                 <Gauge value={rpm} max={8000} label="RPM" type="rpm" />
 
-                {/* ЦЕНТР */}
-                <div className="center-console">
-                    <div className="gear-display">
+                <div className="center-stack">
+                    <div className="gear-box">
                         <span className="gear-label">GEAR</span>
                         <span className="gear-num">{gear}</span>
                     </div>
-                    <div className={`temp-display ${temp > 110 ? 'alert' : ''}`}>
-                        {Math.round(temp)}°C
-                    </div>
+                    <div className={`temp ${temp>115?'alert':''}`}>{Math.round(temp)}°C</div>
                     
-                    <div className="buttons-row">
-                        <button className={`btn ${running ? 'on' : ''}`} onClick={toggleIgnition}>
+                    <div className="btn-row">
+                        <div className={`btn ${running?'on':''}`} onClick={toggleIgnition}>
                             {cranking ? '...' : 'START'}
-                        </button>
-                        <button className={`btn ${lights ? 'active' : ''}`} onClick={toggleLights}>
-                            LIGHT
-                        </button>
-                        <button className={`btn nitro ${nitro ? 'active' : ''}`}
-                            onTouchStart={()=>setNitro(true)} onTouchEnd={()=>setNitro(false)}
-                            onMouseDown={()=>setNitro(true)} onMouseUp={()=>setNitro(false)}>
-                            NITRO
-                        </button>
+                        </div>
+                        <div className={`btn ${lights?'active':''}`} onClick={toggleLights}>LIGHT</div>
+                        <div className={`btn nitro ${nitro?'active':''}`}
+                             onMouseDown={()=>setNitro(true)} onMouseUp={()=>setNitro(false)}
+                             onTouchStart={(e)=>{e.preventDefault();setNitro(true)}} 
+                             onTouchEnd={(e)=>{e.preventDefault();setNitro(false)}}>
+                             NITRO
+                        </div>
                     </div>
                 </div>
 
-                {/* СПИДОМЕТР */}
                 <Gauge value={speed} max={280} label="KM/H" type="speed" />
             </div>
 
-            {/* ПЕДАЛИ */}
-            <div className="pedals-row">
-                <div className="pedal brake" 
-                     onTouchStart={(e)=>handleTouch(e,'brake')} 
-                     onTouchMove={(e)=>handleTouch(e,'brake')} 
-                     onTouchEnd={()=>reset('brake')}>
-                     <div className="pedal-bar" style={{height: `${brake*100}%`}}/>
-                     <span>BRAKE</span>
+            <div className="pedals-area">
+                <div className="pedal-box">
+                    <div className="pedal" onTouchStart={(e)=>handleTouch(e,'brake')} onTouchMove={(e)=>handleTouch(e,'brake')} onTouchEnd={()=>reset('brake')}>
+                        <div className="pedal-bar" style={{height:`${brake*100}%`}}/>
+                    </div>
+                    <div className="pedal-lbl">BRAKE</div>
                 </div>
-                <div className="pedal gas"
-                     onTouchStart={(e)=>handleTouch(e,'gas')} 
-                     onTouchMove={(e)=>handleTouch(e,'gas')} 
-                     onTouchEnd={()=>reset('gas')}>
-                     <div className="pedal-bar" style={{height: `${gas*100}%`}}/>
-                     <span>GAS</span>
+                <div className="pedal-box">
+                    <div className="pedal" onTouchStart={(e)=>handleTouch(e,'gas')} onTouchMove={(e)=>handleTouch(e,'gas')} onTouchEnd={()=>reset('gas')}>
+                        <div className="pedal-bar" style={{height:`${gas*100}%`}}/>
+                    </div>
+                    <div className="pedal-lbl">GAS</div>
                 </div>
             </div>
         </div>
@@ -161,13 +140,12 @@ const Cockpit = () => {
 export default function App() {
   return (
     <>
-      <div id="scene-root">
-        {/* АНТИАЛИАСИНГ ВЫКЛЮЧЕН ДЛЯ FPS */}
-        <Canvas camera={{ position: [0, 1.5, 5], fov: 50 }} dpr={[1, 1.5]} gl={{ antialias: false }}>
+      <div id="canvas-container">
+        <Canvas camera={{ position: [0, 1.3, 5], fov: 50 }} dpr={[1, 1.5]} gl={{ antialias: false }}>
            <Scene />
            <PhysicsSystem />
            <EffectComposer disableNormalPass>
-               <Bloom luminanceThreshold={0.6} intensity={1.5} />
+               <Bloom luminanceThreshold={0.5} intensity={1.5} />
                <Noise opacity={0.08} />
            </EffectComposer>
         </Canvas>

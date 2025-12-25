@@ -18,57 +18,47 @@ body { margin: 0; background: #000; overflow: hidden; user-select: none; }
 .warning-msg {
   position: absolute; top: 20%; left: 50%; transform: translateX(-50%);
   color: red; font-family: 'Orbitron'; font-size: 24px; border: 2px solid red;
-  padding: 10px 20px; background: rgba(0,0,0,0.8); animation: blink 0.2s infinite;
+  padding: 10px 20px; background: rgba(0,0,0,0.8); animation: blink 0.2s infinite; z-index: 20;
 }
 
-/* DASHBOARD CONTAINER */
 .dashboard-wrapper {
   position: relative; width: 100%; height: 50vh;
-  background: linear-gradient(to bottom, #1a1a1a, #000);
-  border-top: 4px solid #333;
-  border-radius: 40px 40px 0 0;
-  pointer-events: auto;
-  display: flex; flex-direction: column; align-items: center;
+  background: linear-gradient(to bottom, #151515, #000);
+  border-top: 4px solid #333; border-radius: 40px 40px 0 0;
+  pointer-events: auto; display: flex; flex-direction: column; align-items: center;
 }
-
 .gauges-row {
   display: flex; justify-content: center; align-items: center; gap: 20px;
-  margin-top: -60px; /* Pull up */
-  transform: scale(0.9);
+  margin-top: -70px; transform: scale(0.9);
 }
 
-/* GAUGES */
+/* ПРИБОРЫ */
 .gauge-well {
-  width: 160px; height: 160px;
-  background: #000; border-radius: 50%;
-  border: 4px solid #333;
-  box-shadow: 0 5px 20px #000;
-  position: relative;
+  width: 170px; height: 170px; background: #000; border-radius: 50%;
+  border: 4px solid #333; box-shadow: 0 5px 20px #000; position: relative;
 }
+.gauge-face { width: 100%; height: 100%; position: relative; }
 
-.gauge-face {
-  width: 100%; height: 100%; position: relative;
-}
-
-/* TICKS & NUMBERS */
+/* РИСКИ */
 .tick-mark {
-  position: absolute; top: 0; left: 50%; width: 2px; height: 100%;
-  /* Линия идет через весь диаметр, но мы скрываем центр маской или просто рисуем края */
-  background: linear-gradient(to bottom, #fff 10%, transparent 10%, transparent 90%, #fff 90%);
-  transform-origin: center;
+  position: absolute; top: 0; left: 50%; transform-origin: center 85px; /* Радиус вращения */
+  background: #666;
+}
+.tick-mark.big {
+  width: 3px; height: 12px; background: #fff; top: 5px; transform-origin: center 80px;
+}
+.tick-mark.small {
+  width: 1px; height: 6px; background: #555; top: 8px; transform-origin: center 77px;
 }
 .tick-num {
   position: absolute; transform: translate(-50%, -50%);
-  color: #fff; font-family: 'Roboto Mono'; font-size: 10px; font-weight: bold;
+  color: #ddd; font-family: 'Roboto Mono'; font-size: 10px; font-weight: bold;
 }
 
-.gauge-info {
-  position: absolute; bottom: 25%; width: 100%; text-align: center;
-}
-.val-big { font-family: 'Orbitron'; font-size: 20px; color: #fff; }
+.gauge-info { position: absolute; bottom: 25%; width: 100%; text-align: center; }
+.val-big { font-family: 'Orbitron'; font-size: 22px; color: #fff; }
 .val-label { font-size: 10px; color: #666; font-weight: bold; }
 
-/* NEEDLE */
 .needle-container {
   position: absolute; top: 0; left: 0; width: 100%; height: 100%;
   transition: transform 0.1s linear;
@@ -80,46 +70,32 @@ body { margin: 0; background: #000; overflow: hidden; user-select: none; }
 }
 .gauge-cap {
   position: absolute; top: 50%; left: 50%; width: 20px; height: 20px;
-  background: #111; transform: translate(-50%,-50%); border-radius: 50%;
-  border: 2px solid #333;
+  background: #111; transform: translate(-50%,-50%); border-radius: 50%; border: 2px solid #333;
 }
 
-/* CENTER CONSOLE */
-.center-console {
-  display: flex; flex-direction: column; align-items: center; gap: 10px;
-  margin-bottom: 20px;
-}
-.gear-display { display: flex; flex-direction: column; align-items: center; }
-.gear-num { font-family: 'Orbitron'; font-size: 40px; color: #888; } /* GREY GEAR */
+.center-console { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 20px; }
+.gear-num { font-family: 'Orbitron'; font-size: 40px; color: #666; } /* СЕРАЯ ПЕРЕДАЧА */
 .gear-label { font-size: 10px; color: #444; }
-
 .temp-display { font-family: 'Orbitron'; color: #0f0; font-size: 14px; }
 .temp-display.alert { color: #f00; animation: blink 0.5s infinite; }
 
 .buttons-row { display: flex; gap: 10px; }
 .btn {
-  width: 60px; height: 60px; border-radius: 50%;
-  background: #111; border: 2px solid #444; color: #555;
-  font-weight: bold; font-size: 10px; cursor: pointer;
+  width: 60px; height: 60px; border-radius: 50%; background: #111;
+  border: 2px solid #444; color: #555; font-weight: bold; font-size: 10px; cursor: pointer;
 }
 .btn.on { border-color: #0f0; color: #0f0; box-shadow: 0 0 10px #0f0; }
-.btn.active { border-color: #f90; color: #f90; box-shadow: 0 0 10px #f90; }
+.btn.active { border-color: #fff; color: #fff; box-shadow: 0 0 10px #fff; }
 .btn.nitro.active { border-color: #00f; color: #00f; box-shadow: 0 0 15px #00f; }
 
-/* PEDALS */
-.pedals-row {
-  width: 100%; display: flex; justify-content: space-between; padding: 20px 40px;
-}
+.pedals-row { width: 100%; display: flex; justify-content: space-between; padding: 20px 40px; }
 .pedal {
   width: 80px; height: 180px; background: #111; border: 2px solid #333;
   border-radius: 8px; position: relative; overflow: hidden;
   display: flex; justify-content: center; align-items: flex-end; padding-bottom: 10px;
   color: #666; font-weight: bold;
 }
-.pedal-bar {
-  position: absolute; bottom: 0; left: 0; width: 100%;
-  background: linear-gradient(to top, #ff9d00, transparent); opacity: 0.8;
-}
+.pedal-bar { position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to top, #ff9d00, transparent); opacity: 0.8; }
 
 @keyframes blink { 0% {opacity: 1} 50% {opacity: 0.2} 100% {opacity: 1} }
 

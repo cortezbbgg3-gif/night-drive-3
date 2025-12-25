@@ -12,41 +12,43 @@ const PhysicsSystem = () => {
   return null;
 }
 
+// Компонент прибора
 const Gauge = ({ value, max, label, type }) => {
-  // Расчет угла для стрелки (-135 до +135)
+  // Стрелка
   const angle = -135 + (Math.min(value, max) / max) * 270;
-  
-  // Генерация рисок и цифр
+
   const renderTicks = () => {
     const ticks = [];
-    const step = type === 'rpm' ? 1000 : 20; // Шаг цифр
+    const stepBig = type === 'rpm' ? 1000 : 20; // Цифры каждые 20 км/ч
+    const stepSmall = type === 'rpm' ? 250 : 10; // Палочки между ними
     const total = type === 'rpm' ? 8000 : 280;
-    
-    for (let i = 0; i <= total; i += step) {
-        // Процент от круга (0..1) для диапазона 270 градусов
+
+    for (let i = 0; i <= total; i += stepSmall) {
         const pct = i / total;
         const deg = -135 + (pct * 270);
-        // Радианы для позиции (с поправкой -90deg т.к. 0 это верх)
-        const rad = (deg - 90) * (Math.PI / 180);
-        
-        // Позиция цифры
-        const rText = 55; // Радиус текста %
-        const tx = 50 + rText * Math.cos(rad);
-        const ty = 50 + rText * Math.sin(rad);
+        const isBig = i % stepBig === 0;
 
-        // Риска (палочка) - используем transform rotate
-        const isMajor = true;
-        
+        // Риска
         ticks.push(
-            <React.Fragment key={i}>
-                {/* Палочка */}
-                <div className="tick-mark" style={{ transform: `rotate(${deg}deg)` }} />
-                {/* Цифра */}
-                <div className="tick-num" style={{ left: `${tx}%`, top: `${ty}%` }}>
+            <div key={`t-${i}`} 
+                 className={`tick-mark ${isBig ? 'big' : 'small'}`} 
+                 style={{ transform: `rotate(${deg}deg)` }} 
+            />
+        );
+
+        // Цифра (только для больших)
+        if (isBig) {
+            const rad = (deg - 90) * (Math.PI / 180);
+            const radius = 65; // Отступ цифр
+            const x = 50 + radius * Math.cos(rad);
+            const y = 50 + radius * Math.sin(rad);
+            
+            ticks.push(
+                <div key={`n-${i}`} className="tick-num" style={{ left: `${x}%`, top: `${y}%` }}>
                     {type === 'rpm' ? i/1000 : i}
                 </div>
-            </React.Fragment>
-        );
+            );
+        }
     }
     return ticks;
   };
@@ -59,7 +61,6 @@ const Gauge = ({ value, max, label, type }) => {
                 <div className="val-big">{type === 'rpm' ? (value/1000).toFixed(1) : Math.round(value)}</div>
                 <div className="val-label">{label}</div>
             </div>
-            {/* Стрелка */}
             <div className="needle-container" style={{ transform: `rotate(${angle}deg)` }}>
                 <div className="needle-arm" />
             </div>
@@ -87,25 +88,22 @@ const Cockpit = () => {
      if (type === 'gas') setGas(val);
      if (type === 'brake') setBrake(val);
   };
-
   const reset = (t) => { if(t==='gas') setGas(0); if(t==='brake') setBrake(0); };
 
   return (
     <div className="ui-layer">
         <div className="vignette-frame" />
-        
         {msg && <div className="warning-msg">{msg}</div>}
 
         <div className="dashboard-wrapper">
             <div className="gauges-row">
-                {/* RPM */}
                 <Gauge value={rpm} max={8000} label="RPM" type="rpm" />
 
-                {/* CENTER */}
                 <div className="center-console">
+                    {/* СЕРАЯ ПЕРЕДАЧА */}
                     <div className="gear-display">
                         <span className="gear-label">GEAR</span>
-                        <span className="gear-num">{gear}</span>
+                        <span className="gear-num" style={{ color: '#666' }}>{gear}</span>
                     </div>
                     <div className={`temp-display ${temp > 110 ? 'alert' : ''}`}>
                         {Math.round(temp)}°C
@@ -126,11 +124,9 @@ const Cockpit = () => {
                     </div>
                 </div>
 
-                {/* SPEED */}
                 <Gauge value={speed} max={280} label="KM/H" type="speed" />
             </div>
 
-            {/* PEDALS */}
             <div className="pedals-row">
                 <div className="pedal brake" 
                      onTouchStart={(e)=>handleTouch(e,'brake')} 
@@ -158,9 +154,10 @@ export default function App() {
       <div id="scene-root">
         <Canvas camera={{ position: [0, 1.4, 5], fov: 45 }} dpr={[1, 1.5]}>
            <Scene />
+           <PhysicsSystem />
            <EffectComposer disableNormalPass>
                <Bloom luminanceThreshold={0.5} intensity={1.2} />
-               <Noise opacity={0.08} />
+               <Noise opacity={0.06} />
            </EffectComposer>
         </Canvas>
       </div>
